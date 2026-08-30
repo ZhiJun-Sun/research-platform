@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from hydrolab import __version__
 from hydrolab.api.container import build_repositories, build_services
+from hydrolab.api.deps import get_object_storage
 from hydrolab.api.routes import api_v1_router
 from hydrolab.api.routes.health import router as health_router
 from hydrolab.core.errors import register_error_handlers
@@ -18,6 +19,16 @@ from hydrolab.core.logging import configure_logging, get_logger, log_with
 from hydrolab.core.middleware import RequestContextMiddleware
 from hydrolab.core.rate_limit import FixedWindowRateLimiter
 from hydrolab.core.settings import get_settings
+from hydrolab.datasets.assets import AssetService
+from hydrolab.datasets.imports import ImportService
+from hydrolab.datasets.memory import (
+    InMemoryArtifactRepository,
+    InMemoryDatasetRepository,
+    InMemoryDatasetVersionRepository,
+    InMemoryFieldMappingRepository,
+    InMemoryFolderRepository,
+    InMemoryImportJobRepository,
+)
 
 _DEV_BOOTSTRAP_EMAIL = "admin@hydrolab.cn"
 _DEV_BOOTSTRAP_PASSWORD = "admin123456"
@@ -36,6 +47,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.share_service = services.share
     app.state.access_policy = services.policy
     app.state.shared_rate_limiter = FixedWindowRateLimiter(limit=30, window_seconds=60)
+
+    # B2 数据存储：与 B1 一样采用 InMemory Repository；对象内容复用 Fake/Local ObjectStorage。
+    app.state.folders = InMemoryFolderRepository()
+    app.state.datasets = InMemoryDatasetRepository()
+    app.state.dataset_versions = InMemoryDatasetVersionRepository()
+    app.state.import_jobs = InMemoryImportJobRepository()
+    app.state.field_mappings = InMemoryFieldMappingRepository()
+    app.state.artifacts = InMemoryArtifactRepository()
+    storage = get_object_storage()
+    app.state.asset_service = AssetService(
+        app.state.folders, app.state.datasets, repos.grants, services.policy
+    )
+    app.state.import_service = ImportService(
+        app.state.datasets,
+        app.state.dataset_versions,
+        app.state.import_jobs,
+        app.state.field_mappings,
+        app.state.artifacts,
+        storage,
+        services.policy,
+    )
 
     # 首个管理员 bootstrap：仅系统无用户时执行一次
     email = settings.bootstrap_admin_email

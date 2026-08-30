@@ -17,7 +17,9 @@ src/hydrolab/
 ├── adapters/
 │   ├── fake/   # 内存实现 + 故障/重复注入（测试与本地开发基线）
 │   └── local/  # 本地文件系统对象存储
-├── api/        # deps 装配 + 路由（B0 仅健康检查）
+├── api/        # deps 装配 + 路由（B0/B1/B2）
+├── datasets/   # 文件夹、数据集、导入、字段映射、不可变版本
+├── repositories/ # B1 身份/授权 InMemory 仓储
 └── main.py     # create_app()
 tests/
 ├── contracts/  # 端口契约测试：Fake/Local/未来真实实现共用
@@ -66,6 +68,34 @@ GET  /api/v1/shared/{token}                 公开访问（字段白名单 + 限
 
 安全语义（均有测试覆盖）：无公开注册；过期/已用/撤销邀请拒绝；用户 A 不可见用户 B 资源；
 VIEWER 不能管理授权和分享；分享过期/撤销返回 410；审计不记录凭证；token 只存 HMAC 哈希。
+
+## B2 已实现：文件夹、数据导入与不可变版本
+
+B2 继续使用进程内仓储和既有 `FakeObjectStorage` / 可选 `LocalFilesystemObjectStorage`，使前端可在无数据库、无 MinIO 的情况下联调数据导入闭环：
+
+```text
+创建文件夹 / 移动文件夹（禁止循环移动）
+→ 创建 Dataset（自动创建 OWNER 授权）
+→ 创建 UPLOAD 导入任务（支持 Idempotency-Key）
+→ 开发联调 fake-upload
+→ CSV 表头探测与字段映射草稿
+→ 用户确认唯一时间字段
+→ 创建带 sha256 / manifest 的 READY DatasetVersion
+```
+
+```text
+GET|POST  /api/v1/folders
+PATCH     /api/v1/folders/{folder_id}
+GET|POST  /api/v1/datasets
+GET       /api/v1/datasets/{dataset_id}
+GET       /api/v1/datasets/{dataset_id}/versions
+POST      /api/v1/dataset-imports
+GET       /api/v1/dataset-imports/{job_id}[/mapping]
+POST      /api/v1/dataset-imports/{job_id}/fake-upload
+POST      /api/v1/dataset-imports/{job_id}/confirm-mapping|cancel|retry
+```
+
+`READY` 版本的 manifest、内容哈希、映射和版本号不会被修改；修正映射必须以新的导入任务形成新版本。当前 `fake-upload` 是开发联调专用端点，生产 S3 预签名 multipart 上传、SSRF 安全 URL 下载、Parquet/NetCDF 内容探测与持久化仓储仍受 S3-01/真实环境门禁约束。
 
 ## 切换到真实服务
 
