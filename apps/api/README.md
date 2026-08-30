@@ -117,6 +117,21 @@ POST /api/v1/parameter-presets
 
 安全与可复现约束：ZIP 拒绝路径穿越、符号链接、文件/解压大小超限与压缩炸弹；Git 只登记无凭证 HTTPS 引用并保持 `PENDING`，未来由隔离 Worker clone；模板仅保存 argv 参数数组，拒绝 Shell 控制符；运行环境要求不可变镜像 digest；ParameterPreset 必须符合 TemplateVersion 的参数 Schema。
 
+## B4 已实现：实验草稿、冻结配置与 QUEUED Run
+
+B4 将已完成的数据、代码、模板、环境和参数资产组合为可保存的 Draft，并在服务端验证后冻结为 `ExperimentVersion`。提交仅创建可追踪的 `QUEUED` Run 和 `run.requested` Fake Outbox 事件，**不会启动 Docker、队列或 GPU**：
+
+```text
+GET|POST  /api/v1/experiment-drafts
+PATCH     /api/v1/experiment-drafts/{id}
+POST      /api/v1/experiment-drafts/{id}/submit   # 支持 Idempotency-Key
+GET       /api/v1/experiments
+GET       /api/v1/experiments/{id}[/versions|/runs]
+GET       /api/v1/runs/{id}/stages
+```
+
+提交时服务端校验全部输入版本为 `READY`、模板与代码版本关联一致、参数符合 Template Schema、资源授权有效；随后保存含输入 hash、argv、环境 hash 和最终参数的 `resolved_config` / `config_hash`。同一幂等键只创建一个 Run；提交后的 Draft 不可修改。
+
 ## 切换到真实服务
 
 按 `plans/05` 的 Spike 门禁逐个启用（见 `infra/README.md` 与 `.env.example`）。

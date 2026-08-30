@@ -40,6 +40,15 @@ from hydrolab.datasets.memory import (
     InMemoryFolderRepository,
     InMemoryImportJobRepository,
 )
+from hydrolab.experiments.memory import (
+    InMemoryDrafts,
+    InMemoryExperiments,
+    InMemoryExperimentVersions,
+    InMemoryOutbox,
+    InMemoryRuns,
+    InMemoryRunStages,
+)
+from hydrolab.experiments.service import ExperimentService
 
 _DEV_BOOTSTRAP_EMAIL = "admin@hydrolab.cn"
 _DEV_BOOTSTRAP_PASSWORD = "admin123456"
@@ -102,6 +111,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.environments,
         app.state.environment_versions,
         app.state.parameter_presets,
+        repos.grants,
+        services.policy,
+    )
+
+    # B4 Draft/Experiment/Run：这里仅写入 QUEUED 元数据和 Fake Outbox，不发起训练。
+    app.state.experiment_drafts = InMemoryDrafts()
+    app.state.experiments = InMemoryExperiments()
+    app.state.experiment_versions = InMemoryExperimentVersions()
+    app.state.runs = InMemoryRuns()
+    app.state.run_stages = InMemoryRunStages()
+    app.state.outbox = InMemoryOutbox()
+    app.state.experiment_service = ExperimentService(
+        app.state.experiment_drafts,
+        app.state.experiments,
+        app.state.experiment_versions,
+        app.state.runs,
+        app.state.run_stages,
+        app.state.outbox,
+        app.state.dataset_versions,
+        app.state.code_versions,
+        app.state.template_versions,
+        app.state.environment_versions,
         repos.grants,
         services.policy,
     )
