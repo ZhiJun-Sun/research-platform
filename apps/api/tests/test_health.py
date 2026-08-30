@@ -1,6 +1,7 @@
 """HTTP 层测试：健康检查、request_id、统一错误模型、OpenAPI 基线。"""
 
 import pytest
+from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 from hydrolab.main import create_app
@@ -9,9 +10,10 @@ from hydrolab.main import create_app
 @pytest.fixture
 async def client() -> AsyncClient:
     app = create_app()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+    async with LifespanManager(app) as manager:
+        transport = ASGITransport(app=manager.app)
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            yield c
 
 
 async def test_live(client: AsyncClient) -> None:

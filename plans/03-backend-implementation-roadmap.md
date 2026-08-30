@@ -1,7 +1,7 @@
 # HydroLab 后端实施路线与验收计划
 
 > 状态：Confirmed  
-> 当前阶段：B0 代码优先骨架已完成（2026-08-29）；B1 待用户确认后启动  
+> 当前阶段：B0 骨架、B1 身份/邀请/授权/分享已完成（2026-08-30，InMemory Repository 基线）；B2 待启动  
 > 目标：按定版交互原型建立可部署、可迁移、可测试的真实后端。
 
 ## 1. 实施前检查清单
@@ -79,6 +79,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 - 不修改前端业务流程。
 
 ### B1：身份、邀请、资源授权与分享基础
+
+> 状态：已完成（InMemory 基线，66 项测试通过；SQL Repository 与 Alembic 迁移随首个真实数据库环境接入）
 
 **实现**
 

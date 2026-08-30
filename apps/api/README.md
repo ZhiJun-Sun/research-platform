@@ -42,6 +42,31 @@ uv run uvicorn hydrolab.main:app --reload
 - `GET /health/ready` — 按启用的后端逐组件报告（Fake 模式如实标注 backend=fake）；
 - `GET /openapi.json` — REST 契约唯一来源。
 
+## B1 已实现：身份、邀请、授权与分享
+
+数据存储为 **InMemory Repository**（进程重启即清空，专供无数据库联调）；
+部署时仅替换 `hydrolab/api/container.py` 中的构造实现为 SQL 版本，服务与路由不变。
+
+本地联调账号（首次启动自动 bootstrap）：`admin@hydrolab.cn` / `admin123456`。
+
+```text
+POST /api/v1/auth/login|refresh|logout      会话（access 30min / refresh 14d，存储哈希）
+GET|PATCH /api/v1/me[/preferences]          当前用户与偏好（Run 卡片布局等）
+POST /api/v1/admin/invitations              管理员邀请（token 仅返回一次）
+GET  /api/v1/admin/invitations              邀请列表（不含 token）
+POST /api/v1/admin/invitations/{id}/revoke  撤销邀请
+POST /api/v1/invitations/{token}/accept     接受邀请（唯一注册入口）
+GET|POST /api/v1/resources/{type}/{id}/grants    资源授权（OWNER/VIEWER）
+DELETE /api/v1/resources/{type}/{id}/grants/{id} 撤销授权
+POST /api/v1/share-links                    创建只读链接（版本锁定 + Idempotency-Key）
+GET  /api/v1/share-links                    我的分享（含访问计数）
+POST /api/v1/share-links/{id}/revoke        撤销（幂等，立即生效）
+GET  /api/v1/shared/{token}                 公开访问（字段白名单 + 限流防枚举）
+```
+
+安全语义（均有测试覆盖）：无公开注册；过期/已用/撤销邀请拒绝；用户 A 不可见用户 B 资源；
+VIEWER 不能管理授权和分享；分享过期/撤销返回 410；审计不记录凭证；token 只存 HMAC 哈希。
+
 ## 切换到真实服务
 
 按 `plans/05` 的 Spike 门禁逐个启用（见 `infra/README.md` 与 `.env.example`）。

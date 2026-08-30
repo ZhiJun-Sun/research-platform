@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     cookie_domain: str | None = None
     runner_signing_key: str = "dev-only-runner-key"
 
+    # --- 首个管理员 bootstrap（仅系统无用户时生效一次） ---
+    # local/test 下未显式配置时使用文档化的开发默认值，便于无数据库联调；
+    # production 必须显式配置且禁止默认值。
+    bootstrap_admin_email: str | None = None
+    bootstrap_admin_password: str | None = None
+    bootstrap_admin_name: str = "平台管理员"
+
     # --- 基础设施连接（未启用真实后端时可为空） ---
     database_url: str | None = None
     redis_url: str | None = None
@@ -88,6 +95,8 @@ class Settings(BaseSettings):
             problems.append("Celery 后端已启用但 HYDROLAB_REDIS_URL 未配置")
         if self.experiment_tracker_backend == "mlflow" and not self.mlflow_tracking_uri:
             problems.append("MLflow 后端已启用但 HYDROLAB_MLFLOW_TRACKING_URI 未配置")
+        if not self.bootstrap_admin_email or not self.bootstrap_admin_password:
+            problems.append("生产环境必须显式配置 BOOTSTRAP_ADMIN_EMAIL/PASSWORD")
         if problems:
             raise RuntimeError("生产配置校验失败: " + "; ".join(problems))
 
