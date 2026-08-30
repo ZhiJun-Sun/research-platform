@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hydrolab.dev/contracts/events/run-event-v1.schema.json",
+  "title": "HydroLab Run Event v1",
+  "description": "Run 结构化事件（JSONL 进度协议 / run_events 表 / SSE）统一契约。对应 plans/02 第 7 节。",
+  "type": "object",
+  "required": ["schema_version", "event_type", "run_id", "occurred_at", "payload"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "run.status.changed",
+        "run.stage.changed",
+        "run.progress.updated",
+        "run.metric.reported",
+        "run.log.available",
+        "run.resource.sampled",
+        "run.artifact.created",
+        "run.failed",
+        "run.completed"
+      ]
+    },
+    "run_id": {"type": "string", "format": "uuid"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "payload": {
+      "type": "object",
+      "description": "按 event_type 约定：progress 含 stage/epoch/batch/percent/eta；metric 含 name/value/step/split/basin_id；log 含 cursor 而非完整日志。",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

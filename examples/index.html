@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG 图表能力全景画廊 — 3大类 13种类型</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans SC', -apple-system, sans-serif; background: #0F1117; color: #E0E0E0; }
+
+  /* Hero */
+  .hero { background: linear-gradient(135deg, #0F1117 0%, #1A1F2E 50%, #0F1117 100%); padding: 60px 40px 40px; text-align: center; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; top: -100px; right: -100px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(107,72,255,0.15), transparent 70%); border-radius: 50%; }
+  .hero::after { content: ''; position: absolute; bottom: -80px; left: -80px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(42,154,58,0.1), transparent 70%); border-radius: 50%; }
+  .hero h1 { font-size: 42px; font-weight: 900; background: linear-gradient(135deg, #6B48FF, #2B7AE8, #2A9A3A); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 3px; position: relative; z-index: 1; }
+  .hero .subtitle { color: #888; font-size: 16px; margin-top: 12px; position: relative; z-index: 1; }
+  .hero .stats { display: flex; justify-content: center; gap: 40px; margin-top: 28px; position: relative; z-index: 1; }
+  .hero .stat-item { text-align: center; }
+  .hero .stat-num { font-size: 32px; font-weight: 900; color: #6B48FF; }
+  .hero .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
+
+  /* Category section */
+  .category { padding: 30px 40px 10px; }
+  .cat-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #252A36; }
+  .cat-badge { padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+  .cat-badge-t { background: linear-gradient(135deg, #1A2A4A, #2B5090); color: #A0C0FF; }
+  .cat-badge-s { background: linear-gradient(135deg, #2A1A4A, #5A3A8A); color: #D0B0FF; }
+  .cat-badge-e { background: linear-gradient(135deg, #4A1A2A, #8A3A5A); color: #FFB0CC; }
+  .cat-title { font-size: 20px; font-weight: 700; }
+  .cat-desc { font-size: 13px; color: #666; margin-left: auto; }
+
+  /* Cards grid */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; padding-bottom: 30px; }
+  .card { background: #1A1F2E; border: 1px solid #252A36; border-radius: 14px; overflow: hidden; transition: all 0.3s ease; cursor: pointer; }
+  .card:hover { border-color: #6B48FF; transform: translateY(-4px); box-shadow: 0 12px 40px rgba(107,72,255,0.15); }
+
+  /* Card preview */
+  .card-preview { height: 220px; background: #F0F3F8; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+  .card-preview img, .card-preview object { width: 100%; height: 100%; object-fit: contain; }
+  .card-preview iframe { width: 100%; height: 100%; border: none; transform: scale(0.6); transform-origin: top left; width: 166.7%; height: 166.7%; }
+  .card-preview .html-badge { position: absolute; top: 8px; right: 8px; background: #E05050; color: white; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; z-index: 2; }
+
+  /* Card info */
+  .card-info { padding: 16px 20px; }
+  .card-code { font-size: 11px; font-weight: 700; color: #6B48FF; letter-spacing: 1px; margin-bottom: 4px; }
+  .card-name { font-size: 15px; font-weight: 700; color: #E0E0E0; margin-bottom: 6px; }
+  .card-desc { font-size: 12px; color: #888; line-height: 1.6; }
+  .card-tags { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .card-tag { padding: 2px 8px; border-radius: 6px; font-size: 10px; background: #252A36; color: #888; }
+  .card-tag-svg { background: #1A2A4A; color: #A0C0FF; }
+  .card-tag-html { background: #4A1A2A; color: #FFB0CC; }
+  .card-file { font-size: 10px; color: #555; margin-top: 8px; font-family: monospace; }
+
+  /* Footer */
+  .footer { text-align: center; padding: 30px; border-top: 1px solid #252A36; margin-top: 20px; }
+  .footer p { color: #555; font-size: 12px; }
+  .footer .brand { color: #6B48FF; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+
+  /* Responsive */
+  @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } .hero h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>SVG 图表能力全景画廊</h1>
+  <div class="subtitle">svg-flowchart-designer skill 可绘制的所有图表类型汇总</div>
+  <div class="stats">
+    <div class="stat-item">
+      <div class="stat-num">3</div>
+      <div class="stat-label">大类</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">13</div>
+      <div class="stat-label">子类型</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">15+</div>
+      <div class="stat-label">示例图</div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== T: Technical Formal ====== -->
+<div class="category">
+  <div class="cat-header">
+    <span class="cat-badge cat-badge-t">T · TECHNICAL</span>
+    <span class="cat-title">技术正式类</span>
+    <span class="cat-desc">架构图 · 流程图 · 对比图 · 矩阵图 — SVG 完全实现</span>
+  </div>
+  <div class="cards">
+
+    <div class="card" onclick="window.open('T1-vertical-pipeline.svg')">
+      <div class="card-preview"><img src="T1-vertical-pipeline.svg" alt="T1"/></div>
+      <div class="card-info">
+        <div class="card-code">T1 · 范式 A</div>
+        <div class="card-name">纵向分层流程图（线性管道）</div>
+        <div class="card-desc">输入→处理→输出的线性流程，带编号行标签和各层横向色块</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">pipeline</span><span class="card-tag">层次清晰</span></div>
+        <div class="card-file">T1-vertical-pipeline.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T2-horizontal-matrix.svg')">
+      <div class="card-preview"><img src="T2-horizontal-matrix.svg" alt="T2"/></div>
+      <div class="card-info">
+        <div class="card-code">T2 · 范式 B</div>
+        <div class="card-name">横向多阶段矩阵图（表格/泳道式）</div>
+        <div class="card-desc">多维度行列交叉，适合展示测试矩阵、优先级判断表等</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">matrix</span><span class="card-tag">多维度</span></div>
+        <div class="card-file">T2-horizontal-matrix.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T2b-horizontal-matrix-eval.svg')">
+      <div class="card-preview"><img src="T2b-horizontal-matrix-eval.svg" alt="T2b"/></div>
+      <div class="card-info">
+        <div class="card-code">T2b · 范式 B 变体</div>
+        <div class="card-name">横向评测流程矩阵（阶段标签+详情展开）</div>
+        <div class="card-desc">六边形箭头标签 + 列背景条 + 步骤节点行 + 详情卡片</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">evaluation</span><span class="card-tag">swimlane</span></div>
+        <div class="card-file">T2b-horizontal-matrix-eval.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T3-before-after-comparison.svg')">
+      <div class="card-preview"><img src="T3-before-after-comparison.svg" alt="T3"/></div>
+      <div class="card-info">
+        <div class="card-code">T3 · 范式 C</div>
+        <div class="card-name">双栏对比图（Before / After）</div>
+        <div class="card-desc">左红右绿，中间 VS 圆徽章，step 节点内嵌规则色块</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">对比</span><span class="card-tag">VS</span></div>
+        <div class="card-file">T3-before-after-comparison.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T3b-dual-column-vs.svg')">
+      <div class="card-preview"><img src="T3b-dual-column-vs.svg" alt="T3b"/></div>
+      <div class="card-info">
+        <div class="card-code">T3b · 范式 C 变体</div>
+        <div class="card-name">双栏 VS 概念对比（任务规则 vs 对话规则）</div>
+        <div class="card-desc">两个等宽概念栏并排，中间 VS 圆，适合概念对比展示</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">概念对比</span></div>
+        <div class="card-file">T3b-dual-column-vs.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T4-multi-layer-architecture.svg')">
+      <div class="card-preview"><img src="T4-multi-layer-architecture.svg" alt="T4"/></div>
+      <div class="card-info">
+        <div class="card-code">T4 · 范式 D</div>
+        <div class="card-name">多层分区架构图（4层 + 左侧标签）</div>
+        <div class="card-desc">数据层/规则层/执行层/输出层，执行层深色背景是核心识别特征</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">architecture</span><span class="card-tag">⭐ 标杆</span></div>
+        <div class="card-file">T4-multi-layer-architecture.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T5-multi-column-cards.svg')">
+      <div class="card-preview"><img src="T5-multi-column-cards.svg" alt="T5"/></div>
+      <div class="card-info">
+        <div class="card-code">T5 · 范式 E</div>
+        <div class="card-name">多列卡片图（3 列平行 + 底部汇聚）</div>
+        <div class="card-desc">3 列等宽卡片 + 底部绿色输出栏汇聚设计，最优案例</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">parallel</span><span class="card-tag">⭐⭐⭐ 最优</span></div>
+        <div class="card-file">T5-multi-column-cards.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T7-concentric-nested.svg')">
+      <div class="card-preview"><img src="T7-concentric-nested.svg" alt="T7"/></div>
+      <div class="card-info">
+        <div class="card-code">T7 · 范式 G</div>
+        <div class="card-name">同心嵌套图（概念层次关系）</div>
+        <div class="card-desc">同心椭圆嵌套，由内到外展示概念层次，视觉语言独特</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">concentric</span><span class="card-tag">层次</span></div>
+        <div class="card-file">T7-concentric-nested.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T-branch-cards.svg')">
+      <div class="card-preview"><img src="T-branch-cards.svg" alt="T-branch"/></div>
+      <div class="card-info">
+        <div class="card-code">T · 分支卡片</div>
+        <div class="card-name">分支判断 + 三列卡片（对话模式选择）</div>
+        <div class="card-desc">顶部触发 → 3 条分支 → 各卡片详情，适合展示判断分流</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">decision</span><span class="card-tag">分支</span></div>
+        <div class="card-file">T-branch-cards.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('T-mixed-timeline-signal.svg')">
+      <div class="card-preview"><img src="T-mixed-timeline-signal.svg" alt="T-mixed"/></div>
+      <div class="card-info">
+        <div class="card-code">T · 混合范式</div>
+        <div class="card-name">时序演进 + 信号分类双栏（上下文污染）</div>
+        <div class="card-desc">上方时间线 + 下方信号/噪音对比，层次丰富的混合布局</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">timeline</span><span class="card-tag">混合</span></div>
+        <div class="card-file">T-mixed-timeline-signal.svg</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== S: Scenario-based ====== -->
+<div class="category">
+  <div class="cat-header">
+    <span class="cat-badge cat-badge-s">S · SCENARIO</span>
+    <span class="cat-title">场景化类</span>
+    <span class="cat-desc">含图标 · 角色 · 对话气泡 · 数据卡片 — SVG 可实现</span>
+  </div>
+  <div class="cards">
+
+    <div class="card" onclick="window.open('S1-scenario-workflow.svg')">
+      <div class="card-preview"><img src="S1-scenario-workflow.svg" alt="S1"/></div>
+      <div class="card-info">
+        <div class="card-code">S1 · 场景化流程图</div>
+        <div class="card-name">Code Review Automation Workflow</div>
+        <div class="card-desc">含文档折角图标、勾选清单、仪表盘进度条、polygon 大箭头</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">icons</span><span class="card-tag">workflow</span></div>
+        <div class="card-file">S1-scenario-workflow.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('S2-character-guided.svg')">
+      <div class="card-preview"><img src="S2-character-guided.svg" alt="S2"/></div>
+      <div class="card-info">
+        <div class="card-code">S2 · 角色引导式图</div>
+        <div class="card-name">AI Agent + Requirement Gathering Phases</div>
+        <div class="card-desc">几何机器人角色 + 对话气泡 + 3 阶段卡片 + 小图标</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">character</span><span class="card-tag">dialog</span></div>
+        <div class="card-file">S2-character-guided.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('S3-flywheel-cycle.svg')">
+      <div class="card-preview"><img src="S3-flywheel-cycle.svg" alt="S3"/></div>
+      <div class="card-info">
+        <div class="card-code">S3 · 环形飞轮图</div>
+        <div class="card-name">Skill 自进化飞轮（循环迭代）</div>
+        <div class="card-desc">5 节点圆形布局 + 中心齿轮 + 贝塞尔曲线箭头 + 底部对比</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">flywheel</span><span class="card-tag">cycle</span></div>
+        <div class="card-file">S3-flywheel-cycle.svg</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('S4-data-showcase-cards.svg')">
+      <div class="card-preview"><img src="S4-data-showcase-cards.svg" alt="S4"/></div>
+      <div class="card-info">
+        <div class="card-code">S4 · 数据展示卡片</div>
+        <div class="card-name">数字里的咖啡星球（暗色高端风）</div>
+        <div class="card-desc">暗棕背景 + 金色大数字 + 半透明玻璃卡片 + 悬挂效果</div>
+        <div class="card-tags"><span class="card-tag card-tag-svg">SVG</span><span class="card-tag">dashboard</span><span class="card-tag">KPI</span></div>
+        <div class="card-file">S4-data-showcase-cards.svg</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== E: Entertainment/Comic ====== -->
+<div class="category">
+  <div class="cat-header">
+    <span class="cat-badge cat-badge-e">E · ENTERTAINMENT</span>
+    <span class="cat-title">漫画娱乐类</span>
+    <span class="cat-desc">信息图 · 四格漫画 — 用 HTML/CSS 实现（SVG 无法画卡通人物）</span>
+  </div>
+  <div class="cards">
+
+    <div class="card" onclick="window.open('E1-comic-infographic.html')">
+      <div class="card-preview">
+        <iframe src="E1-comic-infographic.html" loading="lazy"></iframe>
+        <span class="html-badge">HTML</span>
+      </div>
+      <div class="card-info">
+        <div class="card-code">E1 · 漫画信息图</div>
+        <div class="card-name">Prompt 调优的科学（数据可视化 + 叙事）</div>
+        <div class="card-desc">大数字统计卡片 + 场景插画占位 + 渐变配色。图片位用 [IMG-E1-*] 标注，配有 AI 生图提示词</div>
+        <div class="card-tags"><span class="card-tag card-tag-html">HTML/CSS</span><span class="card-tag">infographic</span><span class="card-tag">+AI提示词</span></div>
+        <div class="card-file">E1-comic-infographic.html</div>
+      </div>
+    </div>
+
+    <div class="card" onclick="window.open('E2-four-panel-comic.html')">
+      <div class="card-preview">
+        <iframe src="E2-four-panel-comic.html" loading="lazy"></iframe>
+        <span class="html-badge">HTML</span>
+      </div>
+      <div class="card-info">
+        <div class="card-code">E2 · 四格叙事漫画</div>
+        <div class="card-name">Prompt 调优的遗忘诅咒（四格故事叙事）</div>
+        <div class="card-desc">4 格故事叙事 + 场景插画占位 + 对话气泡 + CSS 动画。图片位用 [IMG-E2-*] 标注，配有 AI 生图提示词</div>
+        <div class="card-tags"><span class="card-tag card-tag-html">HTML/CSS</span><span class="card-tag">comic</span><span class="card-tag">+AI提示词</span></div>
+        <div class="card-file">E2-four-panel-comic.html</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">
+  <div class="brand">svg-flowchart-designer · v2.0</div>
+  <p>3 大类 · 13 种子类型 · T1–T7 + S1–S4 纯 SVG · E1–E2 用 HTML/CSS 实现</p>
+  <p style="margin-top: 6px; color: #444;">点击任意卡片可全屏查看原文件</p>
+  <p style="margin-top: 4px; color: #888; font-size: 12px;">💡 E1/E2 的图片区域 hover 可查看/复制 AI 生图提示词</p>
+</div>
+
+</body>
+</html>

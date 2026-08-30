@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/></filter>
+    <filter id="s2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#888"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="480" fill="#F8F4FF"/>
+
+  <!-- ====== Robot Character ====== -->
+  <g transform="translate(60, 40)">
+    <!-- Head -->
+    <rect x="10" y="20" width="80" height="70" rx="16" fill="white" stroke="#9B6DC8" stroke-width="2.5"/>
+    <!-- Ears/antennae -->
+    <rect x="0" y="40" width="14" height="24" rx="7" fill="#9B6DC8"/>
+    <rect x="86" y="40" width="14" height="24" rx="7" fill="#9B6DC8"/>
+    <line x1="50" y1="20" x2="50" y2="6" stroke="#9B6DC8" stroke-width="2.5"/>
+    <circle cx="50" cy="4" r="5" fill="#9B6DC8"/>
+    <!-- Eyes -->
+    <circle cx="35" cy="52" r="8" fill="#9B6DC8"/>
+    <circle cx="35" cy="52" r="4" fill="white"/>
+    <circle cx="65" cy="52" r="8" fill="#9B6DC8"/>
+    <circle cx="65" cy="52" r="4" fill="white"/>
+    <!-- Mouth -->
+    <rect x="30" y="68" width="40" height="6" rx="3" fill="#C8A8E8"/>
+    <!-- Body -->
+    <rect x="22" y="94" width="56" height="40" rx="10" fill="white" stroke="#9B6DC8" stroke-width="2"/>
+    <!-- Arms -->
+    <line x1="22" y1="104" x2="8" y2="120" stroke="#9B6DC8" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="78" y1="104" x2="92" y2="120" stroke="#9B6DC8" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Wrench icon in hand -->
+    <circle cx="94" cy="122" r="5" fill="none" stroke="#9B6DC8" stroke-width="1.5"/>
+    <line x1="97" y1="125" x2="104" y2="132" stroke="#9B6DC8" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- ====== Speech Bubble ====== -->
+  <g transform="translate(170, 20)">
+    <rect x="0" y="0" width="520" height="78" rx="16" fill="white" stroke="#9B6DC8" stroke-width="2" filter="url(#s2)"/>
+    <!-- Tail -->
+    <polygon points="-8 40, 12 30, 12 50" fill="white" stroke="#9B6DC8" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="10" y="29" width="6" height="22" fill="white"/>
+    <text x="260" y="36" text-anchor="middle" fill="#5A3A8A" font-size="13" font-weight="bold">AI Agent: "What are the core user challenges?</text>
+    <text x="260" y="56" text-anchor="middle" fill="#5A3A8A" font-size="13" font-weight="bold">Which technical limitations exist? How can we integrate?"</text>
+  </g>
+
+  <!-- ====== Main Title ====== -->
+  <text x="450" y="130" text-anchor="middle" fill="#2D3E56" font-size="18" font-weight="bold">INVERSION PATTERN FOR REQUIREMENT GATHERING</text>
+  <text x="450" y="148" text-anchor="middle" fill="#888" font-size="11">AI-driven requirement analysis through structured phases</text>
+
+  <!-- ====== Phase Cards ====== -->
+  <!-- Phase 1 -->
+  <g transform="translate(60, 170)">
+    <rect x="0" y="0" width="240" height="260" rx="14" fill="white" stroke="#9B6DC8" stroke-width="2" filter="url(#s)"/>
+    <!-- Phase header -->
+    <rect x="0" y="0" width="240" height="50" rx="14" fill="#9B6DC8"/>
+    <rect x="0" y="36" width="240" height="14" fill="#9B6DC8"/>
+    <text x="120" y="28" text-anchor="middle" fill="white" font-size="13" font-weight="bold">PHASE 1: PROBLEM</text>
+    <text x="120" y="44" text-anchor="middle" fill="#E0D0F0" font-size="11">DISCOVERY</text>
+    <!-- Icon: magnifying glass -->
+    <g transform="translate(95, 62)">
+      <circle cx="25" cy="25" r="18" fill="none" stroke="#9B6DC8" stroke-width="2.5"/>
+      <line x1="38" y1="38" x2="50" y2="50" stroke="#9B6DC8" stroke-width="3" stroke-linecap="round"/>
+      <text x="25" y="30" text-anchor="middle" fill="#9B6DC8" font-size="14">?</text>
+    </g>
+    <!-- Bullet points -->
+    <circle cx="28" cy="130" r="4" fill="#9B6DC8"/>
+    <text x="42" y="134" fill="#555" font-size="11">Identify core user needs.</text>
+    <circle cx="28" cy="158" r="4" fill="#9B6DC8"/>
+    <text x="42" y="162" fill="#555" font-size="11">Explore pain points.</text>
+    <circle cx="28" cy="186" r="4" fill="#9B6DC8"/>
+    <text x="42" y="190" fill="#555" font-size="11">Define success criteria.</text>
+    <circle cx="28" cy="214" r="4" fill="#9B6DC8"/>
+    <text x="42" y="218" fill="#555" font-size="11">Map user journey gaps.</text>
+  </g>
+
+  <!-- Arrow between Phase 1 and 2 -->
+  <g transform="translate(308, 285)">
+    <polygon points="0 10, 18 0, 18 5, 30 5, 30 15, 18 15, 18 20" fill="#9B6DC8" opacity="0.6"/>
+  </g>
+
+  <!-- Phase 2 -->
+  <g transform="translate(345, 170)">
+    <rect x="0" y="0" width="240" height="260" rx="14" fill="white" stroke="#888" stroke-width="2" filter="url(#s)"/>
+    <rect x="0" y="0" width="240" height="50" rx="14" fill="#666"/>
+    <rect x="0" y="36" width="240" height="14" fill="#666"/>
+    <text x="120" y="28" text-anchor="middle" fill="white" font-size="13" font-weight="bold">PHASE 2: TECHNICAL</text>
+    <text x="120" y="44" text-anchor="middle" fill="#CCC" font-size="11">CONSTRAINTS</text>
+    <!-- Icon: shield/lock -->
+    <g transform="translate(95, 62)">
+      <rect x="10" y="12" width="30" height="28" rx="4" fill="none" stroke="#888" stroke-width="2.5"/>
+      <circle cx="25" cy="6" r="12" fill="none" stroke="#888" stroke-width="2.5"/>
+      <circle cx="25" cy="26" r="4" fill="#888"/>
+      <line x1="25" y1="30" x2="25" y2="36" stroke="#888" stroke-width="2"/>
+    </g>
+    <circle cx="28" cy="130" r="4" fill="#888"/>
+    <text x="42" y="134" fill="#555" font-size="11">Assess platform limitations.</text>
+    <circle cx="28" cy="158" r="4" fill="#888"/>
+    <text x="42" y="162" fill="#555" font-size="11">Review data security.</text>
+    <circle cx="28" cy="186" r="4" fill="#888"/>
+    <text x="42" y="190" fill="#555" font-size="11">Note existing infrastructure.</text>
+    <circle cx="28" cy="214" r="4" fill="#888"/>
+    <text x="42" y="218" fill="#555" font-size="11">Identify API constraints.</text>
+  </g>
+
+  <!-- Arrow between Phase 2 and 3 -->
+  <g transform="translate(593, 285)">
+    <polygon points="0 10, 18 0, 18 5, 30 5, 30 15, 18 15, 18 20" fill="#9B6DC8" opacity="0.6"/>
+  </g>
+
+  <!-- Phase 3 -->
+  <g transform="translate(630, 170)">
+    <rect x="0" y="0" width="240" height="260" rx="14" fill="white" stroke="#9B6DC8" stroke-width="2" filter="url(#s)"/>
+    <rect x="0" y="0" width="240" height="50" rx="14" fill="#7A52AB"/>
+    <rect x="0" y="36" width="240" height="14" fill="#7A52AB"/>
+    <text x="120" y="28" text-anchor="middle" fill="white" font-size="13" font-weight="bold">PHASE 3: SYNTHESIS</text>
+    <text x="120" y="44" text-anchor="middle" fill="#D0C0E8" font-size="11">INTEGRATION</text>
+    <!-- Icon: puzzle pieces -->
+    <g transform="translate(90, 62)">
+      <rect x="5" y="10" width="20" height="20" rx="3" fill="#9B6DC8" opacity="0.4"/>
+      <rect x="18" y="0" width="20" height="20" rx="3" fill="#7A52AB" opacity="0.6"/>
+      <rect x="28" y="16" width="20" height="20" rx="3" fill="#9B6DC8" opacity="0.5"/>
+      <!-- Sparkle -->
+      <text x="52" y="14" fill="#E8A020" font-size="14">✦</text>
+    </g>
+    <circle cx="28" cy="130" r="4" fill="#7A52AB"/>
+    <text x="42" y="134" fill="#555" font-size="11">Merge needs with constraints.</text>
+    <circle cx="28" cy="158" r="4" fill="#7A52AB"/>
+    <text x="42" y="162" fill="#555" font-size="11">Formulate requirements.</text>
+    <circle cx="28" cy="186" r="4" fill="#7A52AB"/>
+    <text x="42" y="190" fill="#555" font-size="11">Create unified plan.</text>
+    <circle cx="28" cy="214" r="4" fill="#7A52AB"/>
+    <text x="42" y="218" fill="#555" font-size="11">Prioritize deliverables.</text>
+  </g>
+
+  <!-- Bottom label -->
+  <text x="450" y="460" text-anchor="middle" fill="#888" font-size="11">Type: S2 — Character-Guided Diagram with AI Persona &amp; Dialog Bubble</text>
+</svg>

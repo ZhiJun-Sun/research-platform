@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E1 - 漫画信息图：Prompt 调优的科学</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans SC', sans-serif; background: #F5F0E8; display: flex; justify-content: center; padding: 30px; }
+  .infographic { width: 680px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%); padding: 36px 40px 28px; position: relative; overflow: hidden; display: flex; align-items: center; gap: 24px; }
+  .header::after { content: ''; position: absolute; right: -60px; top: -60px; width: 250px; height: 250px; background: radial-gradient(circle, rgba(107,72,255,0.2), transparent); border-radius: 50%; }
+  .header-text { position: relative; z-index: 1; }
+  .header h1 { font-size: 30px; font-weight: 900; color: white; letter-spacing: 2px; }
+  .header .subtitle { color: #A0A0CC; font-size: 13px; margin-top: 6px; }
+
+  /* Progress bar */
+  .progress-bar { height: 4px; background: linear-gradient(90deg, #6B48FF, #2B7AE8, #2A9A3A, #E88020); }
+
+  /* Stats section */
+  .stats-section { padding: 8px 0; }
+  .stat-row { display: flex; align-items: stretch; border-bottom: 1px solid #F0EDE8; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-card { flex: 1; padding: 24px 28px; display: flex; align-items: center; gap: 18px; position: relative; }
+  .stat-card:first-child { border-right: 1px solid #F0EDE8; }
+
+  .stat-content .big-number { font-size: 40px; font-weight: 900; line-height: 1; }
+  .stat-content .unit { font-size: 14px; font-weight: 700; color: #666; }
+  .stat-content .desc { font-size: 12px; color: #888; margin-top: 6px; line-height: 1.5; }
+  .stat-content .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; margin-top: 6px; }
+
+  .card-purple { background: linear-gradient(135deg, #F8F4FF 0%, #F0E8FF 100%); }
+  .card-purple .big-number { color: #6B48FF; }
+  .card-purple .tag { background: #6B48FF; color: white; }
+  .card-blue { background: linear-gradient(135deg, #F0F6FF 0%, #E4EEFF 100%); }
+  .card-blue .big-number { color: #2B7AE8; }
+  .card-blue .tag { background: #2B7AE8; color: white; }
+  .card-orange { background: linear-gradient(135deg, #FFF8F0 0%, #FFF0E0 100%); }
+  .card-orange .big-number { color: #E88020; }
+  .card-orange .tag { background: #E88020; color: white; }
+  .card-green { background: linear-gradient(135deg, #F0FFF4 0%, #E0FFE8 100%); }
+  .card-green .big-number { color: #2A9A3A; }
+  .card-green .tag { background: #2A9A3A; color: white; }
+
+  /* Insight section */
+  .insight { padding: 24px 32px; background: #FAFAFA; border-top: 2px solid #F0EDE8; }
+  .insight h3 { font-size: 15px; color: #6B48FF; font-weight: 700; margin-bottom: 16px; }
+  .insight-items { display: flex; flex-direction: column; gap: 12px; }
+  .insight-item { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: white; border-radius: 14px; border-left: 4px solid; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .insight-item:nth-child(1) { border-color: #E05050; }
+  .insight-item:nth-child(2) { border-color: #E88020; }
+  .insight-item:nth-child(3) { border-color: #2A9A3A; }
+  .insight-item .text { font-size: 13px; color: #555; line-height: 1.6; flex: 1; }
+  .insight-item .text strong { color: #2D3E56; }
+
+  /* Footer */
+  .footer { padding: 18px 32px; text-align: center; background: linear-gradient(135deg, #1A1A2E, #0F3460); }
+  .footer .punch { color: #D0D0FF; font-size: 15px; font-weight: 700; letter-spacing: 1px; }
+  .footer p { color: #555; font-size: 11px; margin-top: 6px; }
+
+  /* ====== Prompt Hover Interaction ====== */
+  .illust-slot {
+    position: relative; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: visible;
+  }
+  .illust-slot .placeholder { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15)); }
+  .illust-slot img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* Hover hint badge */
+  .prompt-badge {
+    position: absolute; bottom: 3px; right: 3px;
+    background: rgba(0,0,0,0.55); color: #FFD700;
+    font-size: 8px; padding: 1px 5px; border-radius: 3px;
+    font-weight: 700; font-family: monospace; z-index: 10;
+    pointer-events: none; transition: opacity 0.2s;
+  }
+  .illust-slot:hover .prompt-badge { opacity: 0; }
+
+  /* Prompt overlay */
+  .prompt-overlay {
+    display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%); background: rgba(26, 26, 46, 0.96); color: white;
+    padding: 14px 18px 14px 18px; border-radius: 12px; width: 340px; z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35); backdrop-filter: blur(6px);
+    font-size: 12px; line-height: 1.6;
+  }
+  /* Triangle pointer */
+  .prompt-overlay::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 8px solid transparent; border-top-color: rgba(26, 26, 46, 0.96);
+  }
+  /* Invisible hover bridge: extends clickable area downward to prevent tooltip from disappearing */
+  .prompt-overlay::before {
+    content: ''; position: absolute; top: 100%; left: 0; width: 100%; height: 24px;
+    background: transparent;
+  }
+  .illust-slot:hover .prompt-overlay { display: block; }
+  .prompt-label { color: #FFD700; font-size: 10px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+  .prompt-text { color: #E0E0FF; margin-bottom: 10px; word-break: break-word; }
+  .copy-btn {
+    background: #6B48FF; color: white; border: none; padding: 5px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700;
+    transition: all 0.2s; width: 100%;
+  }
+  .copy-btn:hover { background: #8B68FF; }
+  .copy-btn.copied { background: #2A9A3A; }
+
+  /* Size variants */
+  .slot-header { width: 100px; height: 100px; border-radius: 16px; z-index: 1; }
+  .slot-stat { width: 90px; height: 90px; border-radius: 14px; }
+  .slot-insight { width: 64px; height: 64px; border-radius: 12px; }
+  .slot-header .placeholder { font-size: 60px; }
+  .slot-stat .placeholder { font-size: 48px; }
+  .slot-insight .placeholder { font-size: 36px; }
+</style>
+</head>
+<body>
+<div class="infographic">
+  <div class="header">
+    <div class="illust-slot slot-header" data-prompt="A friendly data scientist character, wearing lab coat and glasses, holding a glowing document with code symbols, standing confidently, half body portrait, purple and blue color scheme, flat vector illustration, transparent background, 100x100px">
+      <span class="placeholder">🧑‍🔬</span>
+      <span class="prompt-badge">E1-0</span>
+      <div class="prompt-overlay">
+        <div class="prompt-label">🎨 IMG-E1-0 · 头部主插画</div>
+        <p class="prompt-text">A friendly data scientist character, wearing lab coat and glasses, holding a glowing document with code symbols, standing confidently, half body portrait, purple and blue color scheme, flat vector illustration, transparent background, 100x100px</p>
+        <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+      </div>
+    </div>
+    <div class="header-text">
+      <h1>Prompt 调优的科学</h1>
+      <div class="subtitle">数据驱动的 AI 提示词工程洞察 · Comic Infographic</div>
+    </div>
+  </div>
+  <div class="progress-bar"></div>
+
+  <div class="stats-section">
+    <div class="stat-row">
+      <div class="stat-card card-purple">
+        <div class="illust-slot slot-stat" style="background:rgba(107,72,255,0.08);" data-prompt="A developer sitting at desk scratching head in frustration, laptop screen showing red error messages and crossed-out text, multiple crumpled paper balls around, purple tones, flat vector illustration, transparent background, 90x90px">
+          <span class="placeholder">🤯</span>
+          <span class="prompt-badge">E1-1</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-1 · 试错法 (73%)</div>
+            <p class="prompt-text">A developer sitting at desk scratching head in frustration, laptop screen showing red error messages and crossed-out text, multiple crumpled paper balls around, purple tones, flat vector illustration, transparent background, 90x90px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="stat-content">
+          <div class="big-number">73<span class="unit">%</span></div>
+          <div class="desc">的开发者在 prompt 调优时<br>依赖"试错法"而非系统方法</div>
+          <span class="tag">调研数据</span>
+        </div>
+      </div>
+      <div class="stat-card card-blue">
+        <div class="illust-slot slot-stat" style="background:rgba(43,122,232,0.08);" data-prompt="A tired developer slumped on desk next to a large clock showing 4 hours passed, coffee cups scattered around, laptop still open, blue tones, flat vector illustration, transparent background, 90x90px">
+          <span class="placeholder">😴</span>
+          <span class="prompt-badge">E1-2</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-2 · 疲惫等待 (4.2h)</div>
+            <p class="prompt-text">A tired developer slumped on desk next to a large clock showing 4 hours passed, coffee cups scattered around, laptop still open, blue tones, flat vector illustration, transparent background, 90x90px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="stat-content">
+          <div class="big-number">4.2<span class="unit">h</span></div>
+          <div class="desc">平均每次 prompt 调优耗时<br>其中 60% 时间在重复试错</div>
+          <span class="tag">效率痛点</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card card-orange">
+        <div class="illust-slot slot-stat" style="background:rgba(232,128,32,0.08);" data-prompt="Circular arrows surrounding a document with version numbers (v1, v2... v12), showing iteration cycle process, orange tones, flat vector illustration, transparent background, 90x90px">
+          <span class="placeholder">🔄</span>
+          <span class="prompt-badge">E1-3</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-3 · 反复迭代 (12轮)</div>
+            <p class="prompt-text">Circular arrows surrounding a document with version numbers (v1, v2... v12), showing iteration cycle process, orange tones, flat vector illustration, transparent background, 90x90px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="stat-content">
+          <div class="big-number">12<span class="unit">轮</span></div>
+          <div class="desc">一个高质量 prompt 的<br>平均迭代次数（草稿到稳定）</div>
+          <span class="tag">迭代深度</span>
+        </div>
+      </div>
+      <div class="stat-card card-green">
+        <div class="illust-slot slot-stat" style="background:rgba(42,154,58,0.08);" data-prompt="A confident person standing next to a rising bar chart with an upward arrow, chart bars going from small to tall showing 3.5x growth, green tones, flat vector illustration, transparent background, 90x90px">
+          <span class="placeholder">📈</span>
+          <span class="prompt-badge">E1-4</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-4 · 效率提升 (3.5x)</div>
+            <p class="prompt-text">A confident person standing next to a rising bar chart with an upward arrow, chart bars going from small to tall showing 3.5x growth, green tones, flat vector illustration, transparent background, 90x90px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="stat-content">
+          <div class="big-number">3.5<span class="unit">×</span></div>
+          <div class="desc">使用结构化方法后<br>prompt 准确率的提升倍数</div>
+          <span class="tag">系统方法</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <h3>💡 三个改变游戏规则的发现</h3>
+    <div class="insight-items">
+      <div class="insight-item">
+        <div class="illust-slot slot-insight" style="background:#FFF0F0;" data-prompt="A person carefully placing a glowing document into an organized file cabinet/vault, representing knowledge preservation and skill documentation, red accent color, flat vector illustration, transparent background, 64x64px">
+          <span class="placeholder">🗄️</span>
+          <span class="prompt-badge">E1-5</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-5 · 沉淀知识</div>
+            <p class="prompt-text">A person carefully placing a glowing document into an organized file cabinet/vault, representing knowledge preservation and skill documentation, red accent color, flat vector illustration, transparent background, 64x64px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="text"><strong>别猜，写 Skill</strong> — 把调好的 prompt 沉淀为 Skill 文件，一个人踩坑全团队受益，再也不用从零开始</div>
+      </div>
+      <div class="insight-item">
+        <div class="illust-slot slot-insight" style="background:#FFF8F0;" data-prompt="A person holding a magnifying glass examining a target/bullseye with checkmarks, representing quality evaluation and precise measurement, orange accent color, flat vector illustration, transparent background, 64x64px">
+          <span class="placeholder">🎯</span>
+          <span class="prompt-badge">E1-6</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-6 · 评测驱动</div>
+            <p class="prompt-text">A person holding a magnifying glass examining a target/bullseye with checkmarks, representing quality evaluation and precise measurement, orange accent color, flat vector illustration, transparent background, 64x64px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="text"><strong>评测驱动</strong> — 没有评测标准的优化都是在碰运气。先定义什么是"好"，再优化，效率提升 3× 以上</div>
+      </div>
+      <div class="insight-item">
+        <div class="illust-slot slot-insight" style="background:#F0FFF4;" data-prompt="Multiple people pushing a large spinning flywheel/gear together, the flywheel has momentum arrows showing acceleration, representing continuous improvement cycle, green accent color, flat vector illustration, transparent background, 64x64px">
+          <span class="placeholder">⚙️</span>
+          <span class="prompt-badge">E1-7</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E1-7 · 飞轮效应</div>
+            <p class="prompt-text">Multiple people pushing a large spinning flywheel/gear together, the flywheel has momentum arrows showing acceleration, representing continuous improvement cycle, green accent color, flat vector illustration, transparent background, 64x64px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="text"><strong>飞轮效应</strong> — 每次失败的分析结论写回规则库，失败会终止，洞察会留下，飞轮会加速</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="punch">失败会终止，洞察会留下，飞轮会加速 🚀</div>
+    <p>Type: E1 — Comic Infographic · Hover 图片区域查看/复制 AI 生图提示词</p>
+  </div>
+</div>
+<script>
+function copyPrompt(btn) {
+  const text = btn.closest('.prompt-overlay').querySelector('.prompt-text').textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✅ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 复制提示词'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.13"/></filter>
+    <filter id="s2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/></filter>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1A3060"/>
+      <stop offset="100%" style="stop-color:#3A60A0"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+  </defs>
+  <rect width="900" height="460" fill="#F0F3F8"/>
+  <rect x="0" y="0" width="900" height="52" fill="url(#gTitle)"/>
+  <text x="450" y="31" text-anchor="middle" fill="white" font-size="17" font-weight="bold">上下文污染的发生机制</text>
+  <text x="450" y="46" text-anchor="middle" fill="#AACCFF" font-size="11">随着对话轮次增加，有效信号密度持续下降</text>
+
+  <!-- Round 1 -->
+  <rect x="20" y="70" width="130" height="60" rx="8" fill="#E8F2FF" stroke="#5B8DD9" stroke-width="1.5" filter="url(#s2)"/>
+  <text x="85" y="91" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">第 1 轮</text>
+  <text x="85" y="107" text-anchor="middle" fill="#5A7AAA" font-size="9">用户意图 + SKILL.md</text>
+  <text x="85" y="120" text-anchor="middle" fill="#5A7AAA" font-size="9">上下文：干净 ✅</text>
+
+  <!-- Context window round 1 -->
+  <rect x="170" y="62" width="70" height="76" rx="4" fill="#DDEEFF" stroke="#5B8DD9" stroke-width="1"/>
+  <rect x="173" y="65" width="64" height="18" rx="2" fill="#5B8DD9"/>
+  <text x="205" y="76" text-anchor="middle" fill="white" font-size="8">SKILL.md</text>
+  <rect x="173" y="86" width="64" height="14" rx="2" fill="#AAC8F0"/>
+  <text x="205" y="96" text-anchor="middle" fill="#2B5090" font-size="8">用户输入</text>
+  <rect x="173" y="103" width="64" height="14" rx="2" fill="#AAC8F0"/>
+  <text x="205" y="113" text-anchor="middle" fill="#2B5090" font-size="8">模型回答</text>
+  <text x="205" y="148" text-anchor="middle" fill="#3A8A3A" font-size="9">密度高</text>
+
+  <line x1="258" y1="100" x2="272" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Round 3 -->
+  <rect x="272" y="70" width="130" height="60" rx="8" fill="#FFF8E8" stroke="#E0A050" stroke-width="1.5" filter="url(#s2)"/>
+  <text x="337" y="91" text-anchor="middle" fill="#806020" font-size="11" font-weight="bold">第 3 轮</text>
+  <text x="337" y="107" text-anchor="middle" fill="#AA8040" font-size="9">+ 脚本返回 200 行 JSON</text>
+  <text x="337" y="120" text-anchor="middle" fill="#AA8040" font-size="9">+ 中间推理过程</text>
+
+  <!-- Context window round 3 -->
+  <rect x="418" y="58" width="70" height="86" rx="4" fill="#FFEEDD" stroke="#E0A050" stroke-width="1"/>
+  <rect x="421" y="61" width="64" height="16" rx="2" fill="#5B8DD9"/>
+  <text x="453" y="72" text-anchor="middle" fill="white" font-size="8">SKILL.md</text>
+  <rect x="421" y="80" width="64" height="10" rx="2" fill="#AAC8F0"/>
+  <rect x="421" y="93" width="64" height="10" rx="2" fill="#AAC8F0"/>
+  <rect x="421" y="106" width="64" height="12" rx="2" fill="#F0C080"/>
+  <text x="453" y="115" text-anchor="middle" fill="#806020" font-size="7">原始JSON(大)</text>
+  <rect x="421" y="121" width="64" height="10" rx="2" fill="#FFD0A0"/>
+  <text x="453" y="130" text-anchor="middle" fill="#AA6020" font-size="7">推理过程</text>
+  <text x="453" y="155" text-anchor="middle" fill="#AA8030" font-size="9">密度下降 ⚠️</text>
+
+  <line x1="504" y1="100" x2="520" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Round 6 -->
+  <rect x="520" y="70" width="130" height="60" rx="8" fill="#FFEEE8" stroke="#C05030" stroke-width="1.5" filter="url(#s2)"/>
+  <text x="585" y="91" text-anchor="middle" fill="#803020" font-size="11" font-weight="bold">第 6 轮</text>
+  <text x="585" y="107" text-anchor="middle" fill="#C06040" font-size="9">+ 被推翻的决策</text>
+  <text x="585" y="120" text-anchor="middle" fill="#C06040" font-size="9">+ 重复确认轮次</text>
+
+  <!-- Context window round 6 -->
+  <rect x="668" y="52" width="70" height="98" rx="4" fill="#FFE8E0" stroke="#C05030" stroke-width="1"/>
+  <rect x="671" y="55" width="64" height="14" rx="2" fill="#5B8DD9"/>
+  <text x="703" y="65" text-anchor="middle" fill="white" font-size="8">SKILL.md</text>
+  <rect x="671" y="72" width="64" height="8" rx="2" fill="#AAC8F0"/>
+  <rect x="671" y="83" width="64" height="14" rx="2" fill="#F0C080"/>
+  <rect x="671" y="100" width="64" height="10" rx="2" fill="#FFD0A0"/>
+  <rect x="671" y="113" width="64" height="12" rx="2" fill="#F09070"/>
+  <text x="703" y="122" text-anchor="middle" fill="#803020" font-size="7">旧决策残留</text>
+  <rect x="671" y="128" width="64" height="8" rx="2" fill="#F0B090"/>
+  <text x="703" y="159" text-anchor="middle" fill="#C03020" font-size="9">密度很低 ❌</text>
+
+  <!-- Round 6 badge -->
+  <rect x="755" y="70" width="130" height="60" rx="8" fill="#FFE0D8" stroke="#C03020" stroke-width="2" filter="url(#s2)"/>
+  <text x="820" y="88" text-anchor="middle" fill="#C03020" font-size="11" font-weight="bold">症状出现</text>
+  <text x="820" y="104" text-anchor="middle" fill="#C05040" font-size="9">「忘记」之前的设定</text>
+  <text x="820" y="117" text-anchor="middle" fill="#C05040" font-size="9">回答质量下降</text>
+
+  <line x1="748" y1="100" x2="756" y2="100" stroke="#C03020" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Bottom: legend for context window blocks -->
+  <rect x="20" y="190" width="860" height="256" rx="12" fill="white" filter="url(#s)"/>
+  <text x="450" y="214" text-anchor="middle" fill="#1A3060" font-size="14" font-weight="bold">上下文里的内容分类：有效信号 vs 噪音</text>
+
+  <!-- Signal blocks -->
+  <rect x="40" y="228" width="390" height="198" rx="8" fill="#E8F8E8" stroke="#80C880" stroke-width="1.2"/>
+  <text x="235" y="248" text-anchor="middle" fill="#1A6A1A" font-size="12" font-weight="bold">✅ 有效信号（应该保留）</text>
+  <rect x="58" y="258" width="354" height="30" rx="5" fill="#C8ECC8"/>
+  <text x="235" y="277" text-anchor="middle" fill="#1A6A1A" font-size="10">SKILL.md 的规则和字段定义</text>
+  <rect x="58" y="296" width="354" height="30" rx="5" fill="#C8ECC8"/>
+  <text x="235" y="315" text-anchor="middle" fill="#1A6A1A" font-size="10">用户当前意图的核心表述</text>
+  <rect x="58" y="334" width="354" height="30" rx="5" fill="#C8ECC8"/>
+  <text x="235" y="353" text-anchor="middle" fill="#1A6A1A" font-size="10">关键决策的最新状态（版本/范围/时间）</text>
+  <rect x="58" y="372" width="354" height="30" rx="5" fill="#C8ECC8"/>
+  <text x="235" y="391" text-anchor="middle" fill="#1A6A1A" font-size="10">已验证的分析结论摘要</text>
+
+  <!-- Noise blocks -->
+  <rect x="470" y="228" width="390" height="198" rx="8" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1.2"/>
+  <text x="665" y="248" text-anchor="middle" fill="#B03030" font-size="12" font-weight="bold">❌ 噪音（可以替换/清除）</text>
+  <rect x="488" y="258" width="354" height="30" rx="5" fill="#FFD8D8"/>
+  <text x="665" y="277" text-anchor="middle" fill="#B03030" font-size="10">脚本返回的原始 JSON（已分析完毕）</text>
+  <rect x="488" y="296" width="354" height="30" rx="5" fill="#FFD8D8"/>
+  <text x="665" y="315" text-anchor="middle" fill="#B03030" font-size="10">被推翻的旧决策及其相关讨论</text>
+  <rect x="488" y="334" width="354" height="30" rx="5" fill="#FFD8D8"/>
+  <text x="665" y="353" text-anchor="middle" fill="#B03030" font-size="10">已完成节点的中间推理过程</text>
+  <rect x="488" y="372" width="354" height="30" rx="5" fill="#FFD8D8"/>
+  <text x="665" y="391" text-anchor="middle" fill="#B03030" font-size="10">无实质内容的确认轮次（「好的」「明白了」）</text>
+</svg>

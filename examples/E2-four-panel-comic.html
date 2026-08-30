@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E2 - 四格叙事漫画：Prompt 调优的遗忘诅咒</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Sans SC', sans-serif; background: #F5F0E6; display: flex; justify-content: center; padding: 30px; }
+  .comic { width: 820px; background: #FDF8F0; border: 3px solid #2D3E56; border-radius: 12px; overflow: hidden; }
+
+  .comic-title { background: linear-gradient(135deg, #2D3E56, #1A2A4A); padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .comic-title h1 { font-size: 24px; font-weight: 900; color: white; letter-spacing: 3px; }
+  .comic-title .ep { color: #AACCFF; font-size: 12px; }
+
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .panel { border: 2.5px solid #2D3E56; min-height: 340px; overflow: visible; position: relative; }
+  .panel-1 { background: linear-gradient(160deg, #FFF8E8 0%, #FFF0D0 100%); }
+  .panel-2 { background: linear-gradient(160deg, #F0E8FF 0%, #E8D8FF 100%); }
+  .panel-3 { background: linear-gradient(160deg, #E8F8FF 0%, #D0F0FF 100%); }
+  .panel-4 { background: linear-gradient(160deg, #FFE8E8 0%, #FFD0D0 100%); }
+
+  .panel-num { position: absolute; top: 8px; left: 10px; background: #2D3E56; color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; z-index: 5; }
+  .scene { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px 20px 20px; text-align: center; gap: 12px; }
+
+  .bubble { background: white; border: 2.5px solid #2D3E56; border-radius: 16px; padding: 12px 16px; position: relative; max-width: 340px; box-shadow: 2px 3px 0 rgba(0,0,0,0.08); }
+  .bubble::after { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid white; }
+  .bubble::before { content: ''; position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%); border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 12px solid #2D3E56; }
+  .bubble p { font-size: 13px; line-height: 1.6; color: #333; }
+  .bubble strong { color: #E05050; }
+
+  .time-badge { background: #E8D8FF; padding: 4px 14px; border-radius: 20px; border: 2px solid #9B6DC8; font-size: 11px; color: #5A3A8A; font-weight: 700; }
+  .effect { font-size: 12px; color: #888; font-weight: 700; }
+  .effect-big { font-size: 20px; color: #E05050; font-weight: 900; }
+
+  .char-row { display: flex; gap: 16px; align-items: center; }
+  .char-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .char-label { font-size: 10px; color: #888; font-weight: 700; }
+
+  .persona-cards { display: flex; gap: 8px; }
+  .persona-card { background: white; border: 2px solid #E05050; border-radius: 10px; padding: 8px; text-align: center; width: 110px; }
+  .persona-card .card-text { font-size: 9px; color: #E05050; font-weight: 700; line-height: 1.4; }
+
+  .solution-box { background: #FFF0F0; border: 2px dashed #E05050; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; max-width: 360px; }
+  .solution-box p { font-size: 11px; color: #555; line-height: 1.5; }
+  .solution-box strong { color: #2A9A3A; }
+
+  .bottom-bar { background: linear-gradient(135deg, #2D3E56, #1A2A4A); padding: 16px 28px; text-align: center; }
+  .bottom-bar .moral { color: white; font-size: 16px; font-weight: 900; letter-spacing: 2px; }
+  .bottom-bar .credit { color: #666; font-size: 11px; margin-top: 6px; }
+
+  @keyframes sparkle { 0%, 100% { opacity: 0.4; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
+  .anim-sparkle { animation: sparkle 2s ease-in-out infinite; }
+  .float-deco { position: absolute; font-size: 24px; z-index: 2; }
+
+  /* ====== Prompt Hover Interaction (same as E1) ====== */
+  .illust-slot {
+    position: relative; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    overflow: visible;
+  }
+  .illust-slot .placeholder { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+  .illust-slot img { width: 100%; height: 100%; object-fit: contain; }
+
+  .prompt-badge {
+    position: absolute; bottom: 3px; right: 3px;
+    background: rgba(0,0,0,0.55); color: #FFD700;
+    font-size: 7px; padding: 1px 4px; border-radius: 3px;
+    font-weight: 700; font-family: monospace; z-index: 10;
+    pointer-events: none; transition: opacity 0.2s;
+  }
+  .illust-slot:hover .prompt-badge { opacity: 0; }
+
+  .prompt-overlay {
+    display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%); background: rgba(26, 26, 46, 0.96); color: white;
+    padding: 14px 18px 14px 18px; border-radius: 12px; width: 320px; z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35); backdrop-filter: blur(6px);
+    font-size: 12px; line-height: 1.6;
+  }
+  /* Triangle pointer */
+  .prompt-overlay::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 8px solid transparent; border-top-color: rgba(26, 26, 46, 0.96);
+  }
+  /* Invisible hover bridge */
+  .prompt-overlay::before {
+    content: ''; position: absolute; top: 100%; left: 0; width: 100%; height: 24px;
+    background: transparent;
+  }
+  .illust-slot:hover .prompt-overlay { display: block; }
+  .prompt-label { color: #FFD700; font-size: 10px; font-weight: 700; margin-bottom: 6px; }
+  .prompt-text { color: #E0E0FF; margin-bottom: 10px; word-break: break-word; }
+  .copy-btn {
+    background: #6B48FF; color: white; border: none; padding: 5px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700;
+    transition: all 0.2s; width: 100%;
+  }
+  .copy-btn:hover { background: #8B68FF; }
+  .copy-btn.copied { background: #2A9A3A; }
+
+  /* Slot sizes */
+  .slot-panel { width: 160px; height: 120px; border-radius: 12px; border: 2px dashed rgba(0,0,0,0.15); }
+  .slot-panel .placeholder { font-size: 52px; }
+  .slot-char { width: 70px; height: 70px; border-radius: 50%; border: 2px solid; }
+  .slot-char .placeholder { font-size: 32px; }
+  .slot-persona { width: 50px; height: 50px; border-radius: 50%; margin: 0 auto 6px; }
+  .slot-persona .placeholder { font-size: 28px; }
+  .slot-sol { width: 44px; height: 44px; flex-shrink: 0; }
+  .slot-sol .placeholder { font-size: 28px; }
+</style>
+</head>
+<body>
+<div class="comic">
+  <div class="comic-title">
+    <h1>Prompt 调优的遗忘诅咒</h1>
+    <span class="ep">四格漫画 · EP.01</span>
+  </div>
+
+  <div class="panels">
+    <!-- ====== Panel 1: 终于搞定了！ ====== -->
+    <div class="panel panel-1">
+      <div class="panel-num">1</div>
+      <span class="float-deco anim-sparkle" style="top:10px; right:14px;">✨</span>
+      <span class="float-deco anim-sparkle" style="top:38px; right:42px; animation-delay:0.5s;">🎉</span>
+      <div class="scene">
+        <div class="bubble">
+          <p>终于搞定了！<strong>版本3</strong> 效果超赞！<br>结构化指令 + 明确风格 = 完美！</p>
+        </div>
+        <div class="illust-slot slot-panel" style="background:#FFF8E0; border-color:#E8A020;" data-prompt="A happy developer celebrating at desk, arms raised in victory, laptop screen showing green checkmark and Success text, sparkles and confetti around, warm yellow background, joyful expression, flat vector illustration, comic panel feel, 160x120px">
+          <span class="placeholder">🎊😄💻</span>
+          <span class="prompt-badge">E2-1</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E2-1 · 搞定！欢呼庆祝</div>
+            <p class="prompt-text">A happy developer celebrating at desk, arms raised in victory, laptop screen showing green checkmark and Success text, sparkles and confetti around, warm yellow background, joyful expression, flat vector illustration, comic panel feel, 160x120px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="effect">👆 调了 3 天终于搞定</div>
+      </div>
+    </div>
+
+    <!-- ====== Panel 2: 一个月后，忘光了 ====== -->
+    <div class="panel panel-2">
+      <div class="panel-num">2</div>
+      <span class="float-deco" style="top:12px; right:16px; opacity:0.5;">❓</span>
+      <span class="float-deco" style="top:36px; right:40px; opacity:0.4;">❓</span>
+      <div class="scene">
+        <div class="time-badge">📅 一个月后</div>
+        <div class="bubble">
+          <p>怎么调的来着？<br><strong>完全想不起来了！</strong><br>上次的 prompt 改了哪里啊...</p>
+        </div>
+        <div class="illust-slot slot-panel" style="background:#F0E8FF; border-color:#9B6DC8;" data-prompt="A confused developer staring at blank screen with hands on head, question marks floating around the head, empty thought bubble above, calendar showing 1 month later, purple lavender background, worried expression, flat vector illustration, comic panel feel, 160x120px">
+          <span class="placeholder">😰❓💭</span>
+          <span class="prompt-badge">E2-2</span>
+          <div class="prompt-overlay">
+            <div class="prompt-label">🎨 IMG-E2-2 · 一个月后忘光了</div>
+            <p class="prompt-text">A confused developer staring at blank screen with hands on head, question marks floating around the head, empty thought bubble above, calendar showing 1 month later, purple lavender background, worried expression, flat vector illustration, comic panel feel, 160x120px</p>
+            <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+          </div>
+        </div>
+        <div class="effect">脑子一片空白...</div>
+      </div>
+    </div>
+
+    <!-- ====== Panel 3: 同事来问 ====== -->
+    <div class="panel panel-3">
+      <div class="panel-num">3</div>
+      <div class="scene">
+        <div class="bubble" style="margin-bottom: 10px;">
+          <p>你上次那个效果超好！<br>能教教我怎么写的吗？</p>
+        </div>
+        <div class="char-row">
+          <div class="char-col">
+            <div class="illust-slot slot-char" style="background:#D8F0FF; border-color:#5B8DD9;" data-prompt="Upper body portrait of an enthusiastic colleague with bright eyes and smile, holding a notepad ready to learn, eager expression, blue color scheme, flat vector illustration, circular crop, transparent background, 70x70px">
+              <span class="placeholder">🤩</span>
+              <span class="prompt-badge">3a</span>
+              <div class="prompt-overlay">
+                <div class="prompt-label">🎨 IMG-E2-3a · 期待的同事</div>
+                <p class="prompt-text">Upper body portrait of an enthusiastic colleague with bright eyes and smile, holding a notepad ready to learn, eager expression, blue color scheme, flat vector illustration, circular crop, transparent background, 70x70px</p>
+                <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+              </div>
+            </div>
+            <span class="char-label">同事</span>
+          </div>
+          <div class="char-col">
+            <div class="illust-slot slot-char" style="background:#E8D8FF; border-color:#9B6DC8;" data-prompt="Upper body portrait of an embarrassed person with awkward smile, sweat drop on forehead, scratching back of head nervously, purple color scheme, flat vector illustration, circular crop, transparent background, 70x70px">
+              <span class="placeholder">😅</span>
+              <span class="prompt-badge">3b</span>
+              <div class="prompt-overlay">
+                <div class="prompt-label">🎨 IMG-E2-3b · 尴尬的你</div>
+                <p class="prompt-text">Upper body portrait of an embarrassed person with awkward smile, sweat drop on forehead, scratching back of head nervously, purple color scheme, flat vector illustration, circular crop, transparent background, 70x70px</p>
+                <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+              </div>
+            </div>
+            <span class="char-label">你</span>
+          </div>
+        </div>
+        <div style="background:white; border:2px solid #5B8DD9; border-radius:12px; padding:8px 14px; margin-top:6px;">
+          <p style="font-size:12px; color:#555;">嗯...好像是改了那个什么区块...<br><strong style="color:#E05050">具体我也忘了......</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Panel 4: 所有人重复踩坑 ====== -->
+    <div class="panel panel-4">
+      <div class="panel-num">4</div>
+      <span class="float-deco" style="top:8px; right:12px;">🔥</span>
+      <div class="scene">
+        <div class="persona-cards">
+          <div class="persona-card">
+            <div class="illust-slot slot-persona" style="background:#FFD0D0;" data-prompt="Face portrait of a shocked panicked person with wide open mouth, hands on cheeks like The Scream, red error symbols around, red pink tones, flat vector illustration, circular crop, transparent background, 50x50px">
+              <span class="placeholder">😱</span>
+              <span class="prompt-badge">4a</span>
+              <div class="prompt-overlay" style="bottom:calc(100% + 6px); width:280px;">
+                <div class="prompt-label">🎨 IMG-E2-4a · 崩溃的人1</div>
+                <p class="prompt-text">Face portrait of a shocked panicked person with wide open mouth, hands on cheeks like The Scream, red error symbols around, red pink tones, flat vector illustration, circular crop, transparent background, 50x50px</p>
+                <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+              </div>
+            </div>
+            <div class="card-text">生成错误！<br>提示词无效！</div>
+          </div>
+          <div class="persona-card">
+            <div class="illust-slot slot-persona" style="background:#FFD0D0;" data-prompt="Face portrait of an exhausted person with closed eyes and grimace, head tilted back in despair, reset refresh symbol nearby, red pink tones, flat vector illustration, circular crop, transparent background, 50x50px">
+              <span class="placeholder">😫</span>
+              <span class="prompt-badge">4b</span>
+              <div class="prompt-overlay" style="bottom:calc(100% + 6px); width:280px;">
+                <div class="prompt-label">🎨 IMG-E2-4b · 崩溃的人2</div>
+                <p class="prompt-text">Face portrait of an exhausted person with closed eyes and grimace, head tilted back in despair, reset refresh symbol nearby, red pink tones, flat vector illustration, circular crop, transparent background, 50x50px</p>
+                <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+              </div>
+            </div>
+            <div class="card-text">又要从零<br>开始调...</div>
+          </div>
+          <div class="persona-card">
+            <div class="illust-slot slot-persona" style="background:#FFD0D0;" data-prompt="Face portrait of a mind-blown person with spiral eyes and dizzy expression, brain exploding effect, same mistake repeated symbol, red pink tones, flat vector illustration, circular crop, transparent background, 50x50px">
+              <span class="placeholder">🤯</span>
+              <span class="prompt-badge">4c</span>
+              <div class="prompt-overlay" style="bottom:calc(100% + 6px); width:280px;">
+                <div class="prompt-label">🎨 IMG-E2-4c · 崩溃的人3</div>
+                <p class="prompt-text">Face portrait of a mind-blown person with spiral eyes and dizzy expression, brain exploding effect, same mistake repeated symbol, red pink tones, flat vector illustration, circular crop, transparent background, 50x50px</p>
+                <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+              </div>
+            </div>
+            <div class="card-text">第三个人<br>踩同样的坑</div>
+          </div>
+        </div>
+        <div class="effect-big">⚠️ 这不对！</div>
+        <p style="font-size: 12px; color: #C05050; font-weight: 700;">所有人都在重复踩同一个坑</p>
+        <div class="solution-box">
+          <div class="illust-slot slot-sol" data-prompt="A bright glowing light bulb with a document file icon inside it, representing save knowledge as Skill file solution, rays of light emanating outward, green and gold tones, flat vector illustration, transparent background, 44x44px">
+            <span class="placeholder">💡</span>
+            <span class="prompt-badge">E2-5</span>
+            <div class="prompt-overlay" style="bottom:calc(100% + 6px); width:300px;">
+              <div class="prompt-label">🎨 IMG-E2-5 · 解决方案灯泡</div>
+              <p class="prompt-text">A bright glowing light bulb with a document file icon inside it, representing save knowledge as Skill file solution, rays of light emanating outward, green and gold tones, flat vector illustration, transparent background, 44x44px</p>
+              <button class="copy-btn" onclick="copyPrompt(this)">📋 复制提示词</button>
+            </div>
+          </div>
+          <p>解决方案：把 prompt 沉淀为 <strong>Skill 文件</strong><br>一人踩坑，全员受益，永不遗忘</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="moral">失败会终止，洞察会留下，飞轮会加速 🚀</div>
+    <div class="credit">Type: E2 — 4-Panel Narrative Comic · Hover 图片区域查看/复制 AI 生图提示词</div>
+  </div>
+</div>
+<script>
+function copyPrompt(btn) {
+  const text = btn.closest('.prompt-overlay').querySelector('.prompt-text').textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✅ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 复制提示词'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

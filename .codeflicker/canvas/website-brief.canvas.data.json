@@ -1,0 +1,125 @@
+{
+  "briefData": {
+    "badge": "Hydrology Experiment Platform",
+    "title": "最小兼容平台产品确认",
+    "subtitle": "技术路线和服务器环境已经确定。请只确认首版操作体验与视觉方向；也可以按默认假设直接开始。",
+    "questions": [
+      {
+        "id": "home-focus",
+        "question": "登录后的首页最应该优先展示什么？",
+        "hint": "决定平台默认入口",
+        "multi": false,
+        "options": [
+          { "label": "当前训练任务与 GPU 状态", "value": "active_runs" },
+          { "label": "数据集与模型项目", "value": "assets" },
+          { "label": "最近实验与指标", "value": "experiments" },
+          { "label": "创建新实验向导", "value": "new_experiment" }
+        ]
+      },
+      {
+        "id": "experiment-entry",
+        "question": "创建实验时更偏好哪种入口？",
+        "hint": "两种能力后续都可保留，首版需要确定主入口",
+        "multi": false,
+        "options": [
+          { "label": "分步骤向导", "value": "wizard" },
+          { "label": "单页密集表单", "value": "dense_form" },
+          { "label": "从历史实验复制", "value": "clone_run" },
+          { "label": "命令模板优先", "value": "command_first" }
+        ]
+      },
+      {
+        "id": "progress-detail",
+        "question": "训练详情页首屏必须看到哪些信息？",
+        "hint": "可多选",
+        "multi": true,
+        "options": [
+          { "label": "阶段与 Epoch 进度", "value": "stage_epoch" },
+          { "label": "Loss 与水文指标曲线", "value": "metric_charts" },
+          { "label": "实时训练日志", "value": "live_logs" },
+          { "label": "GPU 利用率与显存", "value": "gpu_stats" },
+          { "label": "参数与数据血缘", "value": "lineage" },
+          { "label": "停止与重新运行", "value": "run_actions" }
+        ]
+      },
+      {
+        "id": "asset-view",
+        "question": "数据集、代码和权重主要采用什么浏览方式？",
+        "hint": "影响信息密度与导航效率",
+        "multi": false,
+        "options": [
+          { "label": "目录树加详情面板", "value": "tree_detail" },
+          { "label": "高密度表格", "value": "dense_table" },
+          { "label": "项目卡片加版本列表", "value": "cards_versions" }
+        ]
+      },
+      {
+        "id": "comparison-priority",
+        "question": "首版实验对比最重要的能力是什么？",
+        "hint": "可多选",
+        "multi": true,
+        "options": [
+          { "label": "自动找出参数差异", "value": "config_diff" },
+          { "label": "NSE/KGE/RMSE 指标表", "value": "metric_table" },
+          { "label": "实测与预测曲线叠加", "value": "hydrograph" },
+          { "label": "多流域指标分布", "value": "basin_distribution" },
+          { "label": "导出论文图片和数据", "value": "paper_export" }
+        ]
+      },
+      {
+        "id": "visual-density",
+        "question": "界面的信息密度希望接近哪一种？",
+        "hint": "研究工具通常建议中高密度",
+        "multi": false,
+        "options": [
+          { "label": "中等密度，易学易读", "value": "balanced" },
+          { "label": "高密度，尽量少切页面", "value": "dense" },
+          { "label": "简洁留白，逐步展开", "value": "spacious" }
+        ]
+      },
+      {
+        "id": "color-mode",
+        "question": "日常长时间使用更偏好哪种显示模式？",
+        "hint": "可在后续增加主题切换",
+        "multi": false,
+        "options": [
+          { "label": "亮色为主", "value": "light" },
+          { "label": "深色为主", "value": "dark" },
+          { "label": "跟随系统并可切换", "value": "system" }
+        ]
+      },
+      {
+        "id": "mvp-boundary",
+        "question": "首个可用版本希望达到哪个边界？",
+        "hint": "高级科研能力会继续按计划迭代",
+        "multi": false,
+        "options": [
+          { "label": "完整真实后端与本地部署", "value": "real_mvp" },
+          { "label": "先做交互原型再接后端", "value": "prototype_first" },
+          { "label": "直接准备服务器部署", "value": "server_ready" }
+        ]
+      }
+    ],
+    "theme": {
+      "question": "视觉主题想用哪个？",
+      "hint": "候选来自 references/website-design/themes/G-technical-console.md、A-enterprise-light.md、D-minimal.md、B-dark-pro.md；推荐工程控制台亮色，兼顾科研工具的信息密度和长时间使用。",
+      "presets": [
+        { "label": "工程控制台亮色（信号橙）", "value": "#FF4D00" },
+        { "label": "企业亮色（产品蓝）", "value": "#3B6CF4" },
+        { "label": "极简轻量（中性灰）", "value": "#52525B" },
+        { "label": "深色专业（工程蓝）", "value": "#2563EB" }
+      ]
+    },
+    "assumptions": [
+      "首页优先展示运行任务、双 GPU 状态和最近实验，首要操作是创建实验",
+      "创建实验采用分步骤向导，同时允许从历史任务复制和编辑受控命令模板",
+      "训练详情首屏同时展示阶段进度、指标曲线、GPU 状态，实时日志放在可展开区域",
+      "数据集、代码和权重使用高密度表格与详情抽屉，默认资源私有",
+      "首版接入真实 FastAPI、PostgreSQL、Redis、MinIO、MLflow 和容器 Runner，不只制作静态原型",
+      "视觉采用工程控制台亮色主题，中高信息密度、细边框、小圆角、无渐变和无装饰阴影"
+    ],
+    "submitLabel": "提交产品与视觉选择",
+    "defaultLabel": "按推荐默认值开始",
+    "summaryTitle": "最小兼容平台确认"
+  }
+}

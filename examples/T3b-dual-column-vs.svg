@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.13"/></filter>
+    <filter id="s2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1A3060"/>
+      <stop offset="100%" style="stop-color:#3A60A0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="480" fill="#F0F3F8"/>
+  <rect x="0" y="0" width="900" height="52" fill="url(#gTitle)"/>
+  <text x="450" y="31" text-anchor="middle" fill="white" font-size="17" font-weight="bold">两类规则的分工：任务规则 vs 对话规则</text>
+  <text x="450" y="46" text-anchor="middle" fill="#AACCFF" font-size="11">大多数 Skill 只写了左边，右边几乎是空白</text>
+
+  <!-- LEFT: task rules -->
+  <rect x="20" y="66" width="415" height="400" rx="12" fill="white" filter="url(#s)"/>
+  <rect x="20" y="66" width="415" height="42" rx="12" fill="#2D3E56"/>
+  <rect x="20" y="94" width="415" height="14" fill="#2D3E56"/>
+  <text x="227" y="91" text-anchor="middle" fill="white" font-size="14" font-weight="bold">📋 任务规则（大多数 Skill 都有）</text>
+
+  <!-- items -->
+  <rect x="44" y="126" width="367" height="42" rx="7" fill="#F0F4FA" stroke="#C8D8F0" stroke-width="1" filter="url(#s2)"/>
+  <text x="66" y="142" fill="#2B5090" font-size="12" font-weight="bold">接口调用规则</text>
+  <text x="66" y="158" fill="#5A7AAA" font-size="10">调哪个脚本、传什么参数、字段如何对应</text>
+
+  <rect x="44" y="178" width="367" height="42" rx="7" fill="#F0F4FA" stroke="#C8D8F0" stroke-width="1" filter="url(#s2)"/>
+  <text x="66" y="194" fill="#2B5090" font-size="12" font-weight="bold">数据处理规则</text>
+  <text x="66" y="210" fill="#5A7AAA" font-size="10">返回结果如何过滤、排序、聚合</text>
+
+  <rect x="44" y="230" width="367" height="42" rx="7" fill="#F0F4FA" stroke="#C8D8F0" stroke-width="1" filter="url(#s2)"/>
+  <text x="66" y="246" fill="#2B5090" font-size="12" font-weight="bold">推理步骤规则</text>
+  <text x="66" y="262" fill="#5A7AAA" font-size="10">意图如何拆解、查询条件怎么构造</text>
+
+  <rect x="44" y="282" width="367" height="42" rx="7" fill="#F0F4FA" stroke="#C8D8F0" stroke-width="1" filter="url(#s2)"/>
+  <text x="66" y="298" fill="#2B5090" font-size="12" font-weight="bold">输出格式规则</text>
+  <text x="66" y="314" fill="#5A7AAA" font-size="10">结果如何呈现、用什么结构展示</text>
+
+  <rect x="44" y="334" width="367" height="42" rx="7" fill="#F0F4FA" stroke="#C8D8F0" stroke-width="1" filter="url(#s2)"/>
+  <text x="66" y="350" fill="#2B5090" font-size="12" font-weight="bold">默认值规则</text>
+  <text x="66" y="366" fill="#5A7AAA" font-size="10">时间范围、优先级等字段的默认行为</text>
+
+  <!-- coverage label -->
+  <rect x="44" y="394" width="367" height="54" rx="8" fill="#E8F2FF" stroke="#5B8DD9" stroke-width="1.2"/>
+  <text x="227" y="413" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">覆盖场景</text>
+  <text x="227" y="430" text-anchor="middle" fill="#5A7AAA" font-size="10">用户清晰表达意图 → 模型正确执行 → 返回结果</text>
+  <text x="227" y="444" text-anchor="middle" fill="#5A7AAA" font-size="10">这条「主路」上的所有场景</text>
+
+  <!-- RIGHT: dialogue rules -->
+  <rect x="465" y="66" width="415" height="400" rx="12" fill="white" filter="url(#s)"/>
+  <rect x="465" y="66" width="415" height="42" rx="12" fill="#7A3A1A"/>
+  <rect x="465" y="94" width="415" height="14" fill="#7A3A1A"/>
+  <text x="672" y="91" text-anchor="middle" fill="white" font-size="14" font-weight="bold">💬 对话规则（绝大多数 Skill 缺失）</text>
+
+  <!-- items -->
+  <rect x="489" y="126" width="367" height="42" rx="7" fill="#FFF4EE" stroke="#F0C8A0" stroke-width="1" filter="url(#s2)"/>
+  <text x="511" y="142" fill="#7A3A1A" font-size="12" font-weight="bold">追问规则</text>
+  <text x="511" y="158" fill="#AA6A3A" font-size="10">什么情况下意图不够，不能直接执行，要先问</text>
+
+  <rect x="489" y="178" width="367" height="42" rx="7" fill="#FFF4EE" stroke="#F0C8A0" stroke-width="1" filter="url(#s2)"/>
+  <text x="511" y="194" fill="#7A3A1A" font-size="12" font-weight="bold">主动提示规则</text>
+  <text x="511" y="210" fill="#AA6A3A" font-size="10">数据里有什么特征应该主动说出来，而不是只展示</text>
+
+  <rect x="489" y="230" width="367" height="42" rx="7" fill="#FFF4EE" stroke="#F0C8A0" stroke-width="1" filter="url(#s2)"/>
+  <text x="511" y="246" fill="#7A3A1A" font-size="12" font-weight="bold">降级规则</text>
+  <text x="511" y="262" fill="#AA6A3A" font-size="10">做不到时如何清楚说明，并给出能做到的替代</text>
+
+  <rect x="489" y="282" width="367" height="42" rx="7" fill="#FFF4EE" stroke="#F0C8A0" stroke-width="1" filter="url(#s2)"/>
+  <text x="511" y="298" fill="#7A3A1A" font-size="12" font-weight="bold">能力边界规则</text>
+  <text x="511" y="314" fill="#AA6A3A" font-size="10">哪些问题明确在 Skill 范围之外，不要猜测回答</text>
+
+  <rect x="489" y="334" width="367" height="42" rx="7" fill="#F8F0EC" stroke="#E0B89A" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="511" y="350" fill="#AA8060" font-size="12">结果确认规则（可选）</text>
+  <text x="511" y="366" fill="#CCAA88" font-size="10">执行完后是否需要询问结果是否符合预期</text>
+
+  <!-- coverage label -->
+  <rect x="489" y="394" width="367" height="54" rx="8" fill="#FFF0E8" stroke="#E89060" stroke-width="1.2"/>
+  <text x="672" y="413" text-anchor="middle" fill="#7A3A1A" font-size="11" font-weight="bold">覆盖场景</text>
+  <text x="672" y="430" text-anchor="middle" fill="#AA6A3A" font-size="10">意图模糊 / 超出能力范围 / 数据有异常需关注</text>
+  <text x="672" y="444" text-anchor="middle" fill="#AA6A3A" font-size="10">「主路」以外的所有真实对话场景</text>
+
+  <!-- VS -->
+  <circle cx="450" cy="270" r="24" fill="#2D3E56" filter="url(#s)"/>
+  <text x="450" y="276" text-anchor="middle" fill="white" font-size="13" font-weight="bold">VS</text>
+</svg>

@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 880" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4A90D9"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#D0604A"/>
+    </marker>
+    <filter id="s">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <!-- Global BG -->
+  <rect width="1600" height="880" fill="#F4F6F8" rx="8"/>
+
+  <!-- ============================================================
+       ROW 0  —  PHASE BANNERS  (标题区域 y=14..56)
+  ============================================================ -->
+  <rect x="0" y="0" width="1600" height="60" fill="#EDF0F3" rx="8"/>
+
+  <g transform="translate(28,14)">
+    <polygon points="0,18 13,0 247,0 260,18 247,36 13,36 0,18" fill="#7ECBF5" stroke="#5BB8E8" stroke-width="1"/>
+    <text x="130" y="23" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">评测数据集构建</text>
+  </g>
+  <g transform="translate(298,14)">
+    <polygon points="0,18 13,0 247,0 260,18 247,36 13,36 0,18" fill="#5BB8E8" stroke="#4AA3D5" stroke-width="1"/>
+    <text x="130" y="23" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">评测标准建立</text>
+  </g>
+  <g transform="translate(568,14)">
+    <polygon points="0,18 13,0 247,0 260,18 247,36 13,36 0,18" fill="#4AA3D5" stroke="#3B8EC2" stroke-width="1"/>
+    <text x="130" y="23" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">业务评测</text>
+  </g>
+  <g transform="translate(838,14)">
+    <polygon points="0,18 13,0 247,0 260,18 247,36 13,36 0,18" fill="#C09DD4" stroke="#A882BC" stroke-width="1"/>
+    <text x="130" y="23" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">评测结果输出</text>
+  </g>
+  <g transform="translate(1108,14)">
+    <polygon points="0,18 13,0 247,0 260,18 247,36 13,36 0,18" fill="#EFA0BA" stroke="#D888A4" stroke-width="1"/>
+    <text x="130" y="23" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">线上效果回收</text>
+  </g>
+
+  <!-- ============================================================
+       COLUMN BACKGROUNDS  (贯穿步骤区 + 详情区)
+  ============================================================ -->
+  <rect x="22"   y="60" width="270" height="810" fill="#E8F4FC" rx="0" opacity="0.45"/>
+  <rect x="292"  y="60" width="270" height="810" fill="#DCEEF8" rx="0" opacity="0.45"/>
+  <rect x="562"  y="60" width="270" height="810" fill="#D5EAF4" rx="0" opacity="0.45"/>
+  <rect x="832"  y="60" width="270" height="810" fill="#EDE2F5" rx="0" opacity="0.45"/>
+  <rect x="1102" y="60" width="270" height="810" fill="#FCEAF2" rx="0" opacity="0.45"/>
+
+  <!-- ============================================================
+       ROW 1  —  步骤区  (y=60..230)   浅色横条背景
+  ============================================================ -->
+  <rect x="0" y="60" width="1600" height="170" fill="#FFFFFF" opacity="0.35" rx="0"/>
+
+  <g filter="url(#s)">
+    <rect x="48" y="100" width="218" height="48" rx="8" fill="#B8E6B8" stroke="#7CC47C" stroke-width="1.5"/>
+    <text x="157" y="120" text-anchor="middle" fill="#2D5A2D" font-size="13" font-weight="bold">数据集获取</text>
+    <text x="157" y="137" text-anchor="middle" fill="#2D5A2D" font-size="13" font-weight="bold">&amp; 数据处理</text>
+  </g>
+
+  <line x1="266" y1="124" x2="314" y2="124" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==== Node 2: 三个维度色块组成 ==== -->
+  <g filter="url(#s)">
+    <rect x="318" y="86" width="218" height="76" rx="8" fill="#fff" stroke="#A0B8C8" stroke-width="1.5"/>
+    <!-- 文案评测色条 -->
+    <rect x="326" y="92" width="202" height="18" rx="4" fill="#FFF0A0" stroke="#D4C040" stroke-width="0.8"/>
+    <text x="427" y="105" text-anchor="middle" fill="#6D5A00" font-size="10" font-weight="bold">文案评测标准</text>
+    <!-- 安全合规色条 -->
+    <rect x="326" y="114" width="202" height="18" rx="4" fill="#FFE0C8" stroke="#E0A070" stroke-width="0.8"/>
+    <text x="427" y="127" text-anchor="middle" fill="#7A3800" font-size="10" font-weight="bold">安全合规性评测标准</text>
+    <!-- 端到端色条 -->
+    <rect x="326" y="136" width="202" height="18" rx="4" fill="#C8F0DC" stroke="#70B890" stroke-width="0.8"/>
+    <text x="427" y="149" text-anchor="middle" fill="#1A5A38" font-size="10" font-weight="bold">端到端效果评测标准</text>
+  </g>
+
+  <line x1="536" y1="124" x2="584" y2="124" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==== Node 3: 三条链路 ==== -->
+  <g filter="url(#s)">
+    <rect x="588" y="86" width="218" height="76" rx="8" fill="#fff" stroke="#A0B0C0" stroke-width="1.5"/>
+    <!-- LLM文本评测 -->
+    <rect x="596" y="92"  width="202" height="18" rx="4" fill="#FFF0A0" stroke="#D4C040" stroke-width="0.8"/>
+    <text x="697" y="105" text-anchor="middle" fill="#6D5A00" font-size="10" font-weight="bold">LLM 文本评测</text>
+    <!-- 视频模态评测 -->
+    <rect x="596" y="114" width="202" height="18" rx="4" fill="#FFE0C8" stroke="#E0A070" stroke-width="0.8"/>
+    <text x="697" y="127" text-anchor="middle" fill="#7A3800" font-size="10" font-weight="bold">多模态视频评测</text>
+    <!-- 人工端到端 -->
+    <rect x="596" y="136" width="202" height="18" rx="4" fill="#C8F0DC" stroke="#70B890" stroke-width="0.8"/>
+    <text x="697" y="149" text-anchor="middle" fill="#1A5A38" font-size="10" font-weight="bold">人工端到端评测</text>
+  </g>
+
+  <line x1="806" y1="124" x2="854" y2="124" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==== Node 4 ==== -->
+  <g filter="url(#s)">
+    <rect x="858" y="100" width="218" height="48" rx="8" fill="#E4D4F4" stroke="#B090CC" stroke-width="1.5"/>
+    <text x="967" y="129" text-anchor="middle" fill="#4A2070" font-size="13" font-weight="bold">评测结果汇总</text>
+  </g>
+
+  <line x1="1076" y1="124" x2="1124" y2="124" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ==== Node 5 ==== -->
+  <g filter="url(#s)">
+    <rect x="1128" y="100" width="218" height="48" rx="8" fill="#F4C8D8" stroke="#D098B0" stroke-width="1.5"/>
+    <text x="1237" y="120" text-anchor="middle" fill="#6A2040" font-size="13" font-weight="bold">线上数据采集</text>
+    <text x="1237" y="137" text-anchor="middle" fill="#6A2040" font-size="13" font-weight="bold">&amp; 效果回收</text>
+  </g>
+
+  <!-- ============================================================
+       FEEDBACK ARROWS
+  ============================================================ -->
+  <!-- 评测结果 → 业务评测 prompt调优 -->
+  <path d="M967,100 L967,72 L697,72 L697,86" fill="none" stroke="#4A90D9" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-blue)"/>
+  <text x="830" y="68" text-anchor="middle" fill="#4A90D9" font-size="11" font-weight="bold">评测prompt调优</text>
+
+  <!-- 线上回收 → 数据集 -->
+  <path d="M1128,148 L1128,175 L157,175 L157,148" fill="none" stroke="#D0604A" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-red)"/>
+  <text x="640" y="189" text-anchor="middle" fill="#D0604A" font-size="11" font-weight="bold">业务模型 / 工程调优反馈</text>
+
+  <!-- ============================================================
+       ROW 2  —  详情区  (y=230..870)   稍深背景
+  ============================================================ -->
+  <rect x="0" y="230" width="1600" height="650" fill="#EAEDF0" opacity="0.28" rx="0"/>
+
+  <!-- ============================================================
+       PHASE 1 详情
+  ============================================================ -->
+  <g transform="translate(38, 250)">
+    <rect x="0" y="0" width="242" height="42" rx="5" fill="#fff" stroke="#A8D8A8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="18" text-anchor="middle" fill="#2D5A2D" font-size="11">AI生成广告文案</text>
+    <text x="121" y="34" text-anchor="middle" fill="#6A8A6A" font-size="10">(模板片头/引导语/片尾等)</text>
+
+    <rect x="0" y="94" width="242" height="32" rx="5" fill="#fff" stroke="#A8D8A8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="115" text-anchor="middle" fill="#2D5A2D" font-size="11">AI广告视频成片、模板视频</text>
+
+    <rect x="0" y="52" width="242" height="32" rx="5" fill="#fff" stroke="#A8D8A8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="73" text-anchor="middle" fill="#2D5A2D" font-size="11">模板标题/描述/OCR/ASR</text>
+
+  </g>
+
+  <!-- ============================================================
+       PHASE 2 详情  —  三色分区
+  ============================================================ -->
+
+  <!-- 文案评测（黄色系） -->
+  <g transform="translate(308, 250)">
+    <rect x="0"   y="0"  width="116" height="32" rx="4" fill="#FFF8D8" stroke="#D4C040" stroke-width="0.8" filter="url(#s)"/>
+    <text x="58"  y="21" text-anchor="middle" fill="#6D5A00" font-size="11">安全合规性</text>
+    <rect x="126" y="0"  width="116" height="32" rx="4" fill="#FFF8D8" stroke="#D4C040" stroke-width="0.8" filter="url(#s)"/>
+    <text x="184" y="21" text-anchor="middle" fill="#6D5A00" font-size="11">内容匹配度</text>
+    <rect x="0"   y="40" width="116" height="32" rx="4" fill="#FFF8D8" stroke="#D4C040" stroke-width="0.8" filter="url(#s)"/>
+    <text x="58"  y="61" text-anchor="middle" fill="#6D5A00" font-size="11">语言规范性</text>
+    <rect x="126" y="40" width="116" height="32" rx="4" fill="#FFF8D8" stroke="#D4C040" stroke-width="0.8" filter="url(#s)"/>
+    <text x="184" y="61" text-anchor="middle" fill="#6D5A00" font-size="11">文案吸引力</text>
+    <rect x="63"  y="80" width="116" height="32" rx="4" fill="#FFF8D8" stroke="#D4C040" stroke-width="0.8" filter="url(#s)"/>
+    <text x="121" y="101" text-anchor="middle" fill="#6D5A00" font-size="11">人工创作感</text>
+  </g>
+
+  <!-- 安全合规（橙色系） -->
+  <g transform="translate(308, 380)">
+    <rect x="0"   y="0"  width="116" height="32" rx="4" fill="#FFF0E0" stroke="#E0A070" stroke-width="0.8" filter="url(#s)"/>
+    <text x="58"  y="21" text-anchor="middle" fill="#7A3800" font-size="11">公众人物侵权</text>
+    <rect x="126" y="0"  width="116" height="32" rx="4" fill="#FFF0E0" stroke="#E0A070" stroke-width="0.8" filter="url(#s)"/>
+    <text x="184" y="21" text-anchor="middle" fill="#7A3800" font-size="11">违规内容检测</text>
+    <rect x="0"   y="40" width="116" height="32" rx="4" fill="#FFF0E0" stroke="#E0A070" stroke-width="0.8" filter="url(#s)"/>
+    <text x="58"  y="61" text-anchor="middle" fill="#7A3800" font-size="11">素材版权风险</text>
+    <rect x="126" y="40" width="116" height="32" rx="4" fill="#FFF0E0" stroke="#E0A070" stroke-width="0.8" filter="url(#s)"/>
+    <text x="184" y="61" text-anchor="middle" fill="#7A3800" font-size="11">竞品品牌检测</text>
+  </g>
+
+  <!-- 端到端效果（绿色系） -->
+  <g transform="translate(308, 470)">
+    <rect x="0"   y="0"  width="116" height="32" rx="4" fill="#E0F8EC" stroke="#70B890" stroke-width="0.8" filter="url(#s)"/>
+    <text x="58"  y="21" text-anchor="middle" fill="#1A5A38" font-size="11">视频质量</text>
+    <rect x="126" y="0"  width="116" height="32" rx="4" fill="#E0F8EC" stroke="#70B890" stroke-width="0.8" filter="url(#s)"/>
+    <text x="184" y="21" text-anchor="middle" fill="#1A5A38" font-size="11">片段衔接</text>
+    <rect x="63"  y="40" width="116" height="32" rx="4" fill="#E0F8EC" stroke="#70B890" stroke-width="0.8" filter="url(#s)"/>
+    <text x="121" y="61" text-anchor="middle" fill="#1A5A38" font-size="11">整体观感</text>
+  </g>
+
+  <!-- ============================================================
+       PHASE 3 详情  —  三种评测方式卡片
+  ============================================================ -->
+
+  <g transform="translate(578, 250)">
+    <rect x="0" y="0"   width="242" height="32" rx="5" fill="#FFF8D8" stroke="#D4C040" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="21" text-anchor="middle" fill="#6D5A00" font-size="11">LLM文本评测 - 文案质量</text>
+
+    <rect x="0" y="42"  width="242" height="32" rx="5" fill="#FFF0E0" stroke="#E0A070" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="63" text-anchor="middle" fill="#7A3800" font-size="11">多模态视频评测 - 安全合规</text>
+
+    <rect x="0" y="84"  width="242" height="32" rx="5" fill="#E0F8EC" stroke="#70B890" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="105" text-anchor="middle" fill="#1A5A38" font-size="11">人工端到端评测 - 整体效果</text>
+  </g>
+
+  <!-- ============================================================
+       PHASE 4 详情
+  ============================================================ -->
+  <g transform="translate(848, 250)">
+    <rect x="0" y="0" width="242" height="32" rx="5" fill="#fff" stroke="#C090D8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="21" text-anchor="middle" fill="#4A2070" font-size="11">各维度评分结果汇总</text>
+
+    <rect x="0" y="42" width="242" height="32" rx="5" fill="#fff" stroke="#C090D8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="63" text-anchor="middle" fill="#4A2070" font-size="11">Badcase识别与标注</text>
+
+    <rect x="0" y="84" width="242" height="32" rx="5" fill="#fff" stroke="#C090D8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="105" text-anchor="middle" fill="#4A2070" font-size="11">问题分类统计</text>
+
+    <rect x="0" y="126" width="242" height="32" rx="5" fill="#fff" stroke="#C090D8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="147" text-anchor="middle" fill="#4A2070" font-size="11">评测报告输出</text>
+  </g>
+
+  <!-- ============================================================
+       PHASE 5 详情
+  ============================================================ -->
+  <g transform="translate(1118, 250)">
+    <rect x="0" y="0" width="242" height="32" rx="5" fill="#fff" stroke="#E0A0B8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="21" text-anchor="middle" fill="#6A2040" font-size="11">Badcase归档与分析</text>
+
+    <rect x="0" y="42" width="242" height="32" rx="5" fill="#fff" stroke="#E0A0B8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="63" text-anchor="middle" fill="#6A2040" font-size="11">问题类型归因</text>
+
+    <rect x="0" y="84" width="242" height="32" rx="5" fill="#fff" stroke="#E0A0B8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="105" text-anchor="middle" fill="#6A2040" font-size="11">模型迭代对比验证</text>
+
+    <rect x="0" y="126" width="242" height="32" rx="5" fill="#fff" stroke="#E0A0B8" stroke-width="1" filter="url(#s)"/>
+    <text x="121" y="147" text-anchor="middle" fill="#6A2040" font-size="11">优化方向输入研发侧</text>
+  </g>
+
+</svg>

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="3" stdDeviation="4" flood-opacity="0.3"/></filter>
+    <filter id="glow"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-opacity="0.15" flood-color="#E8A020"/></filter>
+    <linearGradient id="gBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A1410"/>
+      <stop offset="100%" style="stop-color:#2A2018"/>
+    </linearGradient>
+    <linearGradient id="gCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.08)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0.03)"/>
+    </linearGradient>
+    <linearGradient id="gGold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#E8A020"/>
+      <stop offset="100%" style="stop-color:#F0C860"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="900" height="480" fill="url(#gBg)"/>
+
+  <!-- Subtle world map pattern (simplified) -->
+  <g opacity="0.06" fill="none" stroke="#E8A020" stroke-width="0.8">
+    <ellipse cx="200" cy="200" rx="80" ry="50"/>
+    <ellipse cx="320" cy="180" rx="60" ry="70"/>
+    <ellipse cx="500" cy="220" rx="90" ry="40"/>
+    <ellipse cx="650" cy="190" rx="50" ry="60"/>
+    <ellipse cx="750" cy="240" rx="70" ry="35"/>
+    <path d="M100 260 Q 200 200 300 250 Q 400 300 500 240"/>
+    <path d="M400 150 Q 500 180 600 160 Q 700 140 800 170"/>
+  </g>
+
+  <!-- Title area (left side) -->
+  <text x="60" y="230" fill="white" font-size="28" font-weight="bold">数字里的咖啡星球</text>
+  <text x="60" y="260" fill="#C8A060" font-size="14">一组让你重新认识这杯饮料的数据</text>
+
+  <!-- ====== 4 Data Cards (2x2 grid) ====== -->
+
+  <!-- Card 1: 20亿杯/天 -->
+  <g transform="translate(420, 60)">
+    <!-- Card bg with glass effect -->
+    <rect x="0" y="0" width="210" height="160" rx="12" fill="url(#gCard)" stroke="rgba(255,255,255,0.12)" stroke-width="1" filter="url(#s)"/>
+    <!-- Hanging wire -->
+    <rect x="90" y="-24" width="30" height="6" rx="3" fill="#8A6A3A"/>
+    <line x1="95" y1="-18" x2="95" y2="0" stroke="#8A6A3A" stroke-width="1.5"/>
+    <line x1="115" y1="-18" x2="115" y2="0" stroke="#8A6A3A" stroke-width="1.5"/>
+    <!-- Big number -->
+    <text x="20" y="48" fill="url(#gGold)" font-size="32" font-weight="bold">20</text>
+    <text x="82" y="48" fill="#C8A060" font-size="16">亿杯/天</text>
+    <!-- Cup icon -->
+    <g transform="translate(162, 20)">
+      <rect x="0" y="4" width="24" height="20" rx="3" fill="none" stroke="#E8A020" stroke-width="1.5"/>
+      <path d="M24 8 Q 32 8 32 16 Q 32 24 24 24" fill="none" stroke="#E8A020" stroke-width="1.5"/>
+      <path d="M6 0 Q 8 -4 10 0" fill="none" stroke="#E8A020" stroke-width="1" opacity="0.6"/>
+      <path d="M12 -2 Q 14 -6 16 -2" fill="none" stroke="#E8A020" stroke-width="1" opacity="0.6"/>
+    </g>
+    <!-- Description -->
+    <text x="20" y="80" fill="#C8A060" font-size="11">全球每天消耗，是地球第二</text>
+    <text x="20" y="96" fill="#C8A060" font-size="11">大消耗饮料（仅次于水）</text>
+    <!-- Bottom line accent -->
+    <rect x="20" y="130" width="60" height="2" rx="1" fill="#E8A020" opacity="0.5"/>
+  </g>
+
+  <!-- Card 2: 第2大贸易商品 -->
+  <g transform="translate(660, 60)">
+    <rect x="0" y="0" width="210" height="160" rx="12" fill="url(#gCard)" stroke="rgba(255,255,255,0.12)" stroke-width="1" filter="url(#s)"/>
+    <rect x="90" y="-24" width="30" height="6" rx="3" fill="#8A6A3A"/>
+    <line x1="95" y1="-18" x2="95" y2="0" stroke="#8A6A3A" stroke-width="1.5"/>
+    <line x1="115" y1="-18" x2="115" y2="0" stroke="#8A6A3A" stroke-width="1.5"/>
+    <text x="20" y="38" fill="#C8A060" font-size="14">第</text>
+    <text x="40" y="52" fill="url(#gGold)" font-size="38" font-weight="bold">2</text>
+    <text x="68" y="48" fill="#C8A060" font-size="14">大贸易商品</text>
+    <!-- Globe icon -->
+    <g transform="translate(164, 22)">
+      <circle cx="12" cy="12" r="12" fill="none" stroke="#E8A020" stroke-width="1.5"/>
+      <ellipse cx="12" cy="12" rx="6" ry="12" fill="none" stroke="#E8A020" stroke-width="1"/>
+      <line x1="0" y1="12" x2="24" y2="12" stroke="#E8A020" stroke-width="1"/>
+    </g>
+    <text x="20" y="80" fill="#C8A060" font-size="11">涉及超过1亿农民生计，</text>
+    <text x="20" y="96" fill="#C8A060" font-size="11">仅次于石油</text>
+    <rect x="20" y="130" width="60" height="2" rx="1" fill="#E8A020" opacity="0.5"/>
+  </g>
+
+  <!-- Card 3: 前3大产国 -->
+  <g transform="translate(420, 260)">
+    <rect x="0" y="0" width="210" height="160" rx="12" fill="url(#gCard)" stroke="rgba(255,255,255,0.12)" stroke-width="1" filter="url(#s)"/>
+    <rect x="90" y="-6" width="30" height="6" rx="3" fill="#8A6A3A"/>
+    <text x="20" y="38" fill="#C8A060" font-size="14">前</text>
+    <text x="40" y="52" fill="url(#gGold)" font-size="38" font-weight="bold">3</text>
+    <text x="68" y="48" fill="#C8A060" font-size="14">大产国</text>
+    <!-- Plant/leaf icon -->
+    <g transform="translate(164, 16)">
+      <path d="M12 24 L12 10 Q 2 0 12 -2 Q 22 0 12 10" fill="none" stroke="#E8A020" stroke-width="1.5"/>
+      <path d="M12 18 Q 6 12 12 10" fill="none" stroke="#E8A020" stroke-width="1"/>
+    </g>
+    <text x="20" y="80" fill="#C8A060" font-size="11">埃塞俄比亚 · 巴西 · 哥伦比</text>
+    <text x="20" y="96" fill="#C8A060" font-size="11">亚，中国云南是新贵产地</text>
+    <rect x="20" y="130" width="60" height="2" rx="1" fill="#E8A020" opacity="0.5"/>
+  </g>
+
+  <!-- Card 4: +25%/年 -->
+  <g transform="translate(660, 260)">
+    <rect x="0" y="0" width="210" height="160" rx="12" fill="url(#gCard)" stroke="rgba(255,255,255,0.12)" stroke-width="1" filter="url(#s)"/>
+    <rect x="90" y="-6" width="30" height="6" rx="3" fill="#8A6A3A"/>
+    <text x="20" y="48" fill="url(#gGold)" font-size="28" font-weight="bold">+25</text>
+    <text x="110" y="48" fill="#C8A060" font-size="16">%/年</text>
+    <!-- Trend arrow -->
+    <g transform="translate(164, 16)">
+      <polyline points="0 24, 8 16, 16 20, 24 4" fill="none" stroke="#E8A020" stroke-width="2" stroke-linecap="round"/>
+      <polygon points="22 0, 28 2, 24 8" fill="#E8A020"/>
+    </g>
+    <text x="20" y="80" fill="#C8A060" font-size="11">中国咖啡市场年增速，预计</text>
+    <text x="20" y="96" fill="#C8A060" font-size="11">2025年突破3000亿元人民币</text>
+    <rect x="20" y="130" width="60" height="2" rx="1" fill="#E8A020" opacity="0.5"/>
+  </g>
+
+  <!-- Page number -->
+  <text x="840" y="460" text-anchor="end" fill="#666" font-size="12">9 / 12</text>
+
+  <!-- Bottom label -->
+  <text x="450" y="468" text-anchor="middle" fill="#666" font-size="11">Type: S4 — Data Showcase Cards (Dark Theme, KPI Dashboard Style)</text>
+</svg>

@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 500" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/>
+    </filter>
+    <filter id="s2">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#888"/>
+    </marker>
+    <marker id="arrow-w" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="white"/>
+    </marker>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1A3060"/>
+      <stop offset="100%" style="stop-color:#3A60A0"/>
+    </linearGradient>
+    <linearGradient id="gOut" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E4A1E"/>
+      <stop offset="100%" style="stop-color:#2E6A2E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="860" height="500" fill="#F2F5FA"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="860" height="50" fill="url(#gTitle)"/>
+  <text x="430" y="27" text-anchor="middle" fill="white" font-size="17" font-weight="bold">让 AI「会估、会分」：三层上下文注入策略</text>
+  <text x="430" y="43" text-anchor="middle" fill="#AACCFF" font-size="11">没有上下文的 AI 只能套公式 · 有了这三层，它才真的「懂」你的团队</text>
+
+  <!-- =============================== -->
+  <!-- LAYER 1: SP fallback chain -->
+  <!-- =============================== -->
+  <rect x="30" y="68" width="248" height="320" rx="12" fill="white" stroke="#5B8DD9" stroke-width="1.8" filter="url(#s)"/>
+  <!-- header -->
+  <rect x="30" y="68" width="248" height="38" rx="12" fill="#5B8DD9"/>
+  <rect x="30" y="92" width="248" height="14" fill="#5B8DD9"/>
+  <text x="154" y="91" text-anchor="middle" fill="white" font-size="13" font-weight="bold">第一层 · SP 估算 fallback 链</text>
+
+  <text x="154" y="124" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">解决「数据缺失时怎么估」</text>
+
+  <!-- step 1 -->
+  <rect x="48" y="135" width="212" height="52" rx="7" fill="#E8F2FF" stroke="#84B0DC" stroke-width="1"/>
+  <text x="68" y="153" fill="#1A4080" font-size="11" font-weight="bold">① 已填测试 SP</text>
+  <text x="68" y="168" fill="#4A6090" font-size="10">sp_total &gt; 0 → 直接使用</text>
+  <text x="68" y="180" fill="#4A6090" font-size="10">标注「已填」，视为准确值</text>
+
+  <!-- arrow -->
+  <line x1="154" y1="187" x2="154" y2="198" stroke="#999" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="165" y="196" fill="#999" font-size="9">无则降级</text>
+
+  <!-- step 2 -->
+  <rect x="48" y="200" width="212" height="52" rx="7" fill="#EDF5FF" stroke="#84B0DC" stroke-width="1"/>
+  <text x="68" y="218" fill="#1A4080" font-size="11" font-weight="bold">② 研发 SP 推算</text>
+  <text x="68" y="233" fill="#4A6090" font-size="10">双端均值 ÷ 3～4 = 参考值</text>
+  <text x="68" y="245" fill="#4A6090" font-size="10">标注「估算（需确认）」</text>
+
+  <!-- arrow -->
+  <line x1="154" y1="252" x2="154" y2="263" stroke="#999" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="165" y="261" fill="#999" font-size="9">无则降级</text>
+
+  <!-- step 3 -->
+  <rect x="48" y="265" width="212" height="52" rx="7" fill="#F0F8FF" stroke="#84B0DC" stroke-width="1"/>
+  <text x="68" y="283" fill="#1A4080" font-size="11" font-weight="bold">③ 需求 Doc 详述</text>
+  <text x="68" y="298" fill="#4A6090" font-size="10">docs-shuttle 拉取，只读详述</text>
+  <text x="68" y="310" fill="#4A6090" font-size="10">综合功能范围判断复杂度</text>
+
+  <!-- arrow -->
+  <line x1="154" y1="317" x2="154" y2="328" stroke="#999" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="165" y="327" fill="#999" font-size="9">都没有</text>
+
+  <!-- fallback -->
+  <rect x="48" y="330" width="212" height="40" rx="7" fill="#FFF0F0" stroke="#E07070" stroke-width="1"/>
+  <text x="154" y="347" text-anchor="middle" fill="#C03030" font-size="11" font-weight="bold">⚠️ 标注「待确认」</text>
+  <text x="154" y="362" text-anchor="middle" fill="#C03030" font-size="10">人工跟进，不阻断流程</text>
+
+  <!-- =============================== -->
+  <!-- LAYER 2: Feature module knowledge -->
+  <!-- =============================== -->
+  <rect x="306" y="68" width="248" height="320" rx="12" fill="white" stroke="#9B6DC8" stroke-width="1.8" filter="url(#s)"/>
+  <rect x="306" y="68" width="248" height="38" rx="12" fill="#9B6DC8"/>
+  <rect x="306" y="92" width="248" height="14" fill="#9B6DC8"/>
+  <text x="430" y="91" text-anchor="middle" fill="white" font-size="13" font-weight="bold">第二层 · 功能模块知识库</text>
+
+  <text x="430" y="124" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">解决「AI 不认识你的产品」</text>
+
+  <!-- module items -->
+  <rect x="322" y="135" width="216" height="238" rx="7" fill="#F8F2FF" stroke="#C090D8" stroke-width="1"/>
+
+  <text x="334" y="156" fill="#4A2070" font-size="11" font-weight="bold">高级编辑（高编）</text>
+  <text x="334" y="170" fill="#7A5AAA" font-size="10">多轨道 · 坑位 · 模板发布 — 高复杂</text>
+
+  <line x1="334" y1="177" x2="522" y2="177" stroke="#E0D0F0" stroke-width="1"/>
+  <text x="334" y="193" fill="#4A2070" font-size="11" font-weight="bold">剪同款 / 模板消费</text>
+  <text x="334" y="207" fill="#7A5AAA" font-size="10">素材替换 · AI效果联动 — 高复杂</text>
+
+  <line x1="334" y1="214" x2="522" y2="214" stroke="#E0D0F0" stroke-width="1"/>
+  <text x="334" y="230" fill="#4A2070" font-size="11" font-weight="bold">AI 效果（生成类）</text>
+  <text x="334" y="244" fill="#7A5AAA" font-size="10">积分限制 · 前后端联调 — 高复杂</text>
+
+  <line x1="334" y1="251" x2="522" y2="251" stroke="#E0D0F0" stroke-width="1"/>
+  <text x="334" y="267" fill="#4A2070" font-size="11" font-weight="bold">商业化 / VIP / 营销</text>
+  <text x="334" y="281" fill="#7A5AAA" font-size="10">权益校验 · 边界条件多 — 高复杂</text>
+
+  <line x1="334" y1="288" x2="522" y2="288" stroke="#E0D0F0" stroke-width="1"/>
+  <text x="334" y="304" fill="#4A2070" font-size="11" font-weight="bold">字幕 / 配音</text>
+  <text x="334" y="318" fill="#7A5AAA" font-size="10">ASR · TTS · 样式 — 中复杂</text>
+
+  <line x1="334" y1="325" x2="522" y2="325" stroke="#E0D0F0" stroke-width="1"/>
+  <text x="334" y="341" fill="#4A2070" font-size="11" font-weight="bold">草稿管理 / UI 改版</text>
+  <text x="334" y="355" fill="#7A5AAA" font-size="10">基础 CRUD · 视觉验证 — 低复杂</text>
+
+  <text x="430" y="375" text-anchor="middle" fill="#7A5AAA" font-size="10">→ 避免用公式一刀切，AI 能识别模块复杂度</text>
+
+  <!-- =============================== -->
+  <!-- LAYER 3: Team member profiles -->
+  <!-- =============================== -->
+  <rect x="582" y="68" width="248" height="320" rx="12" fill="white" stroke="#2E8A50" stroke-width="1.8" filter="url(#s)"/>
+  <rect x="582" y="68" width="248" height="38" rx="12" fill="#2E8A50"/>
+  <rect x="582" y="92" width="248" height="14" fill="#2E8A50"/>
+  <text x="706" y="91" text-anchor="middle" fill="white" font-size="13" font-weight="bold">第三层 · 成员能力画像</text>
+
+  <text x="706" y="124" text-anchor="middle" fill="#1A5A30" font-size="11" font-weight="bold">解决「谁来测哪条更合适」</text>
+
+  <!-- member rows -->
+  <rect x="598" y="135" width="216" height="148" rx="7" fill="#EEF8F2" stroke="#80C890" stroke-width="1"/>
+
+  <text x="610" y="153" fill="#1A4A28" font-size="10" font-weight="bold">高级工程师（3人）</text>
+  <text x="610" y="166" fill="#3A7A50" font-size="10">承接大需求 SP≥2 · 模板/AI效果/商业化</text>
+
+  <line x1="610" y1="173" x2="802" y2="173" stroke="#C0E8C8" stroke-width="1"/>
+  <text x="610" y="188" fill="#1A4A28" font-size="10" font-weight="bold">中级工程师（3人）</text>
+  <text x="610" y="201" fill="#3A7A50" font-size="10">中等需求 SP 1～2 · AI/字幕/配音/高编</text>
+
+  <line x1="610" y1="208" x2="802" y2="208" stroke="#C0E8C8" stroke-width="1"/>
+  <text x="610" y="223" fill="#1A4A28" font-size="10" font-weight="bold">初级工程师（2人）</text>
+  <text x="610" y="236" fill="#3A7A50" font-size="10">简单需求 SP≤1.5 · iOS 执行无限制</text>
+
+  <line x1="610" y1="243" x2="802" y2="243" stroke="#C0E8C8" stroke-width="1"/>
+  <text x="610" y="258" fill="#1A4A28" font-size="10" font-weight="bold">正岗人员（9人）</text>
+  <text x="610" y="271" fill="#3A7A50" font-size="10">交叉测试 · 模板领域优先昕彦</text>
+
+  <rect x="598" y="294" width="216" height="100" rx="7" fill="#EEF8F2" stroke="#80C890" stroke-width="1"/>
+  <text x="706" y="311" text-anchor="middle" fill="#1A4A28" font-size="10" font-weight="bold">分配决策规则</text>
+  <text x="610" y="328" fill="#3A7A50" font-size="10">• 均衡优先：总 SP 偏差 ≤ 1.5</text>
+  <text x="610" y="343" fill="#3A7A50" font-size="10">• 能力匹配：大需求不能给初级</text>
+  <text x="610" y="358" fill="#3A7A50" font-size="10">• 领域聚合：同模块优先同一人</text>
+  <text x="610" y="373" fill="#3A7A50" font-size="10">• 用例职责：安卓负责人写用例</text>
+
+  <!-- =============================== -->
+  <!-- BOTTOM: three layers → output -->
+  <!-- =============================== -->
+  <!-- Arrow from layer 1 to output -->
+  <line x1="154" y1="388" x2="154" y2="418" stroke="#5B8DD9" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- Arrow from layer 2 to output -->
+  <line x1="430" y1="388" x2="430" y2="418" stroke="#9B6DC8" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- Arrow from layer 3 to output -->
+  <line x1="706" y1="388" x2="706" y2="418" stroke="#2E8A50" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Output bar -->
+  <rect x="30" y="418" width="800" height="62" rx="10" fill="url(#gOut)" filter="url(#s)"/>
+  <text x="430" y="440" text-anchor="middle" fill="white" font-size="14" font-weight="bold">🤖  三层上下文注入 → AI 综合推理 → 均衡且合理的排期方案</text>
+  <text x="200" y="462" text-anchor="middle" fill="#90D890" font-size="11">SP 有来源标注，可追溯</text>
+  <text x="430" y="462" text-anchor="middle" fill="#90D890" font-size="11">模块复杂度识别，不套公式</text>
+  <text x="665" y="462" text-anchor="middle" fill="#90D890" font-size="11">能力匹配 + 领域聚合分配</text>
+</svg>

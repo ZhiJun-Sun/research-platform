@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.12"/></filter>
+    <filter id="s2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/></filter>
+    <marker id="arrowDark" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2D3E56"/>
+    </marker>
+  </defs>
+
+  <!-- Paper-like background -->
+  <rect width="900" height="520" fill="#FBF7F0"/>
+  <rect width="900" height="520" fill="none" stroke="#E0D8C8" stroke-width="3"/>
+
+  <!-- Title area -->
+  <text x="60" y="50" fill="#2D3E56" font-size="24" font-weight="bold">Skill 自进化飞轮</text>
+  <text x="60" y="72" fill="#888" font-size="13">让 AI 从每次失败中积累经验，越用越强</text>
+
+  <!-- Small robot icon near title -->
+  <g transform="translate(340, 30)">
+    <rect x="0" y="4" width="22" height="18" rx="5" fill="white" stroke="#9B6DC8" stroke-width="1.5"/>
+    <circle cx="7" cy="12" r="2.5" fill="#9B6DC8"/>
+    <circle cx="15" cy="12" r="2.5" fill="#9B6DC8"/>
+    <line x1="11" y1="0" x2="11" y2="4" stroke="#9B6DC8" stroke-width="1.5"/>
+    <circle cx="11" cy="-2" r="2" fill="#9B6DC8"/>
+  </g>
+
+  <!-- ====== FLYWHEEL CENTER ====== -->
+  <g transform="translate(420, 280)">
+    <!-- Outer ring -->
+    <circle cx="0" cy="0" r="56" fill="none" stroke="#E0D8C8" stroke-width="2" stroke-dasharray="8,4"/>
+    <!-- Inner gear -->
+    <circle cx="0" cy="0" r="32" fill="#F0ECE4" stroke="#C8C0B0" stroke-width="2"/>
+    <circle cx="0" cy="0" r="10" fill="#C8C0B0"/>
+    <!-- Gear teeth -->
+    <rect x="-4" y="-36" width="8" height="10" rx="2" fill="#C8C0B0"/>
+    <rect x="-4" y="26" width="8" height="10" rx="2" fill="#C8C0B0"/>
+    <rect x="-36" y="-4" width="10" height="8" rx="2" fill="#C8C0B0"/>
+    <rect x="26" y="-4" width="10" height="8" rx="2" fill="#C8C0B0"/>
+    <!-- Labels -->
+    <text x="0" y="-2" text-anchor="middle" fill="#2D3E56" font-size="14" font-weight="bold">飞</text>
+    <text x="0" y="14" text-anchor="middle" fill="#2D3E56" font-size="14" font-weight="bold">轮</text>
+  </g>
+
+  <!-- ====== 5 Flywheel Nodes (circular layout) ====== -->
+
+  <!-- Node 1: Top (12 o'clock) — Skill 生成 (Blue) -->
+  <g transform="translate(420, 110)">
+    <circle cx="0" cy="0" r="55" fill="#D8ECFF" stroke="#5B8DD9" stroke-width="2" filter="url(#s2)"/>
+    <text x="0" y="-12" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">Skill A 生成,</text>
+    <text x="0" y="4" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">根据规则库</text>
+    <text x="0" y="20" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">生成内容</text>
+  </g>
+
+  <!-- Node 2: Right (2 o'clock) — 检测评测 (Purple) -->
+  <g transform="translate(600, 200)">
+    <circle cx="0" cy="0" r="55" fill="#EDE0F8" stroke="#9B6DC8" stroke-width="2" filter="url(#s2)"/>
+    <text x="0" y="-12" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">检测大师评测,</text>
+    <text x="0" y="4" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">四维打分加</text>
+    <text x="0" y="20" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">改进建议</text>
+    <!-- Magnifying glass icon -->
+    <circle cx="40" cy="-40" r="10" fill="none" stroke="#9B6DC8" stroke-width="1.5"/>
+    <line x1="47" y1="-33" x2="54" y2="-26" stroke="#9B6DC8" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Node 3: Lower-right (4 o'clock) — 改进指令 (Teal) -->
+  <g transform="translate(560, 390)">
+    <circle cx="0" cy="0" r="55" fill="#D8F4F0" stroke="#3A9A8A" stroke-width="2" filter="url(#s2)"/>
+    <text x="0" y="-12" text-anchor="middle" fill="#1A6A5A" font-size="11" font-weight="bold">改进指令,</text>
+    <text x="0" y="4" text-anchor="middle" fill="#1A6A5A" font-size="11" font-weight="bold">失分点变成</text>
+    <text x="0" y="20" text-anchor="middle" fill="#1A6A5A" font-size="11" font-weight="bold">操作清单</text>
+    <!-- Clipboard icon -->
+    <rect x="32" y="-48" width="16" height="20" rx="3" fill="none" stroke="#3A9A8A" stroke-width="1.5"/>
+    <rect x="36" y="-52" width="8" height="6" rx="2" fill="#3A9A8A"/>
+  </g>
+
+  <!-- Node 4: Lower-left (8 o'clock) — 重新生成 (Orange) -->
+  <g transform="translate(280, 390)">
+    <circle cx="0" cy="0" r="55" fill="#FFF0D8" stroke="#E8A020" stroke-width="2" filter="url(#s2)"/>
+    <text x="0" y="-12" text-anchor="middle" fill="#7A4A00" font-size="11" font-weight="bold">重新生成,</text>
+    <text x="0" y="4" text-anchor="middle" fill="#7A4A00" font-size="11" font-weight="bold">带着清单</text>
+    <text x="0" y="20" text-anchor="middle" fill="#7A4A00" font-size="11" font-weight="bold">再来一次</text>
+    <!-- Refresh icon -->
+    <path d="M36 -44 A 10 10 0 1 1 26 -44" fill="none" stroke="#E8A020" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="38 -48, 38 -40, 32 -44" fill="#E8A020"/>
+  </g>
+
+  <!-- Node 5: Left (10 o'clock) — 达标判断 (Pink) -->
+  <g transform="translate(240, 200)">
+    <circle cx="0" cy="0" r="55" fill="#FFE0E8" stroke="#D06080" stroke-width="2" filter="url(#s2)"/>
+    <text x="0" y="-12" text-anchor="middle" fill="#8A2040" font-size="11" font-weight="bold">达标判断,</text>
+    <text x="0" y="4" text-anchor="middle" fill="#8A2040" font-size="11" font-weight="bold">分数够了</text>
+    <text x="0" y="20" text-anchor="middle" fill="#8A2040" font-size="11" font-weight="bold">就停</text>
+    <!-- Checkmark -->
+    <text x="40" y="-32" fill="#D06080" font-size="20">✓</text>
+  </g>
+
+  <!-- ====== Curved Arrows Between Nodes ====== -->
+  <!-- 1→2 -->
+  <path d="M470 135 Q 540 130 570 170" fill="none" stroke="#2D3E56" stroke-width="2.5" marker-end="url(#arrowDark)"/>
+  <!-- 2→3 -->
+  <path d="M620 255 Q 630 320 590 355" fill="none" stroke="#2D3E56" stroke-width="2.5" marker-end="url(#arrowDark)"/>
+  <!-- 3→4 -->
+  <path d="M505 405 Q 440 430 340 405" fill="none" stroke="#2D3E56" stroke-width="2.5" marker-end="url(#arrowDark)"/>
+  <!-- 4→5 -->
+  <path d="M250 350 Q 220 310 235 255" fill="none" stroke="#2D3E56" stroke-width="2.5" marker-end="url(#arrowDark)"/>
+  <!-- 5→1 -->
+  <path d="M268 155 Q 310 110 365 110" fill="none" stroke="#2D3E56" stroke-width="2.5" marker-end="url(#arrowDark)"/>
+
+  <!-- ====== Side Annotations ====== -->
+  <!-- Right annotation: write to skill -->
+  <g transform="translate(700, 120)">
+    <line x1="0" y1="0" x2="-40" y2="10" stroke="#888" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <!-- Book icon -->
+    <rect x="6" y="-20" width="28" height="22" rx="3" fill="none" stroke="#888" stroke-width="1.5"/>
+    <line x1="20" y1="-20" x2="20" y2="2" stroke="#888" stroke-width="1"/>
+    <!-- Sparkle -->
+    <text x="38" y="-14" fill="#E8A020" font-size="12">✦</text>
+    <text x="0" y="18" fill="#555" font-size="10">规则写入 Skill 文件,</text>
+    <text x="0" y="32" fill="#555" font-size="10">永久生效,</text>
+    <text x="0" y="46" fill="#555" font-size="10">一人踩坑全员受益</text>
+  </g>
+
+  <!-- ====== Bottom comparison bar ====== -->
+  <!-- Left: traditional -->
+  <g transform="translate(40, 456)">
+    <rect x="0" y="0" width="260" height="44" rx="8" fill="#E8E4DC" stroke="#C8C0B0" stroke-width="1.2"/>
+    <!-- Confused person icon -->
+    <circle cx="28" cy="14" r="8" fill="#C8C0B0"/>
+    <text x="24" y="38" fill="#888" font-size="10">?</text>
+    <text x="50" y="16" fill="#888" font-size="10" font-weight="bold">传统方式</text>
+    <text x="50" y="32" fill="#AAA" font-size="9">经验在脑子里，换人重来每次从零</text>
+  </g>
+
+  <!-- Right: flywheel -->
+  <g transform="translate(560, 456)">
+    <rect x="0" y="0" width="300" height="44" rx="8" fill="#FFF0E0" stroke="#E8A020" stroke-width="1.2"/>
+    <!-- Happy person icon -->
+    <circle cx="28" cy="14" r="8" fill="#E8A020"/>
+    <text x="50" y="16" fill="#7A4A00" font-size="10" font-weight="bold">飞轮方式</text>
+    <text x="50" y="32" fill="#AA6A10" font-size="9">规则在 Skill 里，一人踩坑全员受益，越用越强</text>
+  </g>
+
+  <!-- Bottom tagline -->
+  <text x="450" y="512" text-anchor="middle" fill="#2D3E56" font-size="12" font-weight="bold">失败会终止，洞察会留下，飞轮会加速</text>
+</svg>

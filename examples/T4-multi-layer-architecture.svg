@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s">
+      <feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.13"/>
+    </filter>
+    <filter id="s2">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.09"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+    <marker id="arrow-w" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#AACCFF"/>
+    </marker>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1A3060"/>
+      <stop offset="100%" style="stop-color:#3A60A0"/>
+    </linearGradient>
+    <linearGradient id="gSkill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#EEF4FF"/>
+      <stop offset="100%" style="stop-color:#D8E8FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#F0F3F8"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="900" height="52" fill="url(#gTitle)"/>
+  <text x="450" y="31" text-anchor="middle" fill="white" font-size="19" font-weight="bold">快影测试人力分配 Skill — 整体架构</text>
+  <text x="450" y="46" text-anchor="middle" fill="#AACCFF" font-size="11">数据层 · 规则层 · 执行层 · 输出层 四层架构</text>
+
+  <!-- Layer Labels on left -->
+  <text x="28" y="110" fill="#555" font-size="11" font-weight="bold">数据层</text>
+  <text x="28" y="210" fill="#555" font-size="11" font-weight="bold">规则层</text>
+  <text x="28" y="318" fill="#555" font-size="11" font-weight="bold">执行层</text>
+  <text x="28" y="430" fill="#555" font-size="11" font-weight="bold">输出层</text>
+
+  <!-- Separator lines -->
+  <line x1="70" y1="70" x2="70" y2="490" stroke="#CCCCCC" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- ============ DATA LAYER ============ -->
+  <rect x="80" y="68" width="770" height="90" rx="10" fill="white" stroke="#5B8DD9" stroke-width="1.5" filter="url(#s)"/>
+  <text x="465" y="84" text-anchor="middle" fill="#2B5090" font-size="12" font-weight="bold">📡  数据来源</text>
+
+  <!-- Three data source boxes -->
+  <rect x="98" y="92" width="230" height="54" rx="6" fill="#E8F2FF" stroke="#84B0DC" stroke-width="1.2"/>
+  <text x="213" y="112" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">Team 平台 API</text>
+  <text x="213" y="127" text-anchor="middle" fill="#5A7AAA" font-size="10">demand_query/main.py</text>
+  <text x="213" y="140" text-anchor="middle" fill="#5A7AAA" font-size="10">36 字段 · Android + iOS · 全量需求</text>
+
+  <rect x="348" y="92" width="230" height="54" rx="6" fill="#E8F2FF" stroke="#84B0DC" stroke-width="1.2"/>
+  <text x="463" y="112" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">版本信息</text>
+  <text x="463" y="127" text-anchor="middle" fill="#5A7AAA" font-size="10">freeze_time · gray_time</text>
+  <text x="463" y="140" text-anchor="middle" fill="#5A7AAA" font-size="10">封版时间推算测试周期</text>
+
+  <rect x="598" y="92" width="230" height="54" rx="6" fill="#E8F2FF" stroke="#84B0DC" stroke-width="1.2"/>
+  <text x="713" y="112" text-anchor="middle" fill="#2B5090" font-size="11" font-weight="bold">已有分配信息</text>
+  <text x="713" y="127" text-anchor="middle" fill="#5A7AAA" font-size="10">qa1 · sp_total · cross_qa</text>
+  <text x="713" y="140" text-anchor="middle" fill="#5A7AAA" font-size="10">已分配直接保留，不重新分配</text>
+
+  <!-- Arrow down -->
+  <line x1="465" y1="158" x2="465" y2="175" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ============ RULE LAYER ============ -->
+  <rect x="80" y="175" width="770" height="100" rx="10" fill="white" stroke="#9B6DC8" stroke-width="1.5" filter="url(#s)"/>
+  <text x="465" y="191" text-anchor="middle" fill="#5A3A8A" font-size="12" font-weight="bold">📚  Skill 知识库（规则层）</text>
+
+  <rect x="98" y="200" width="170" height="62" rx="6" fill="#F0E8FC" stroke="#C090D8" stroke-width="1.2"/>
+  <text x="183" y="218" text-anchor="middle" fill="#4A2070" font-size="11" font-weight="bold">SKILL.md</text>
+  <text x="183" y="232" text-anchor="middle" fill="#7A4AAA" font-size="10">9 步执行流程</text>
+  <text x="183" y="246" text-anchor="middle" fill="#7A4AAA" font-size="10">SP 规则 · 输出格式</text>
+  <text x="183" y="260" text-anchor="middle" fill="#7A4AAA" font-size="9">封版时间推算规则</text>
+
+  <rect x="283" y="200" width="170" height="62" rx="6" fill="#F0E8FC" stroke="#C090D8" stroke-width="1.2"/>
+  <text x="368" y="218" text-anchor="middle" fill="#4A2070" font-size="11" font-weight="bold">team-members.md</text>
+  <text x="368" y="232" text-anchor="middle" fill="#7A4AAA" font-size="10">8 名外包工程师</text>
+  <text x="368" y="246" text-anchor="middle" fill="#7A4AAA" font-size="10">能力等级 · 领域经验</text>
+  <text x="368" y="260" text-anchor="middle" fill="#7A4AAA" font-size="9">高级 / 中级 / 初级分组</text>
+
+  <rect x="468" y="200" width="170" height="62" rx="6" fill="#F0E8FC" stroke="#C090D8" stroke-width="1.2"/>
+  <text x="553" y="218" text-anchor="middle" fill="#4A2070" font-size="11" font-weight="bold">allocation-rules.md</text>
+  <text x="553" y="232" text-anchor="middle" fill="#7A4AAA" font-size="10">分配优先级规则</text>
+  <text x="553" y="246" text-anchor="middle" fill="#7A4AAA" font-size="10">均衡偏差 ≤ 1.5 SP</text>
+  <text x="553" y="260" text-anchor="middle" fill="#7A4AAA" font-size="9">交叉测试分配策略</text>
+
+  <rect x="653" y="200" width="175" height="62" rx="6" fill="#F0E8FC" stroke="#C090D8" stroke-width="1.2"/>
+  <text x="740" y="218" text-anchor="middle" fill="#4A2070" font-size="11" font-weight="bold">domain-knowledge.md</text>
+  <text x="740" y="232" text-anchor="middle" fill="#7A4AAA" font-size="10">快影功能模块说明</text>
+  <text x="740" y="246" text-anchor="middle" fill="#7A4AAA" font-size="10">高编 / 模板 / 商业化</text>
+  <text x="740" y="260" text-anchor="middle" fill="#7A4AAA" font-size="9">领域匹配的知识基础</text>
+
+  <!-- Arrow down -->
+  <line x1="465" y1="275" x2="465" y2="292" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ============ EXECUTION LAYER ============ -->
+  <rect x="80" y="292" width="770" height="100" rx="10" fill="#2D3E56" filter="url(#s)"/>
+  <text x="465" y="309" text-anchor="middle" fill="white" font-size="13" font-weight="bold">🤖  Skill AI 执行层</text>
+  <text x="465" y="323" text-anchor="middle" fill="#AACCFF" font-size="10">加载 Skill → 读取 JSON → 推理分配 → 生成方案</text>
+
+  <!-- Three execution boxes -->
+  <rect x="100" y="330" width="180" height="50" rx="6" fill="rgba(255,255,255,0.12)"/>
+  <text x="190" y="351" text-anchor="middle" fill="white" font-size="11" font-weight="bold">合并 + SP 估算</text>
+  <text x="190" y="365" text-anchor="middle" fill="#AACCFF" font-size="10">研发 SP 参考 + 标题描述</text>
+  <text x="190" y="378" text-anchor="middle" fill="#AACCFF" font-size="10">需求 Doc 综合判断估算</text>
+
+  <rect x="355" y="330" width="180" height="50" rx="6" fill="rgba(255,255,255,0.12)"/>
+  <text x="445" y="351" text-anchor="middle" fill="white" font-size="11" font-weight="bold">均衡分配算法</text>
+  <text x="445" y="365" text-anchor="middle" fill="#AACCFF" font-size="10">容量计算 · 能力匹配</text>
+  <text x="445" y="378" text-anchor="middle" fill="#AACCFF" font-size="10">偏差迭代直到 ≤ 1.5 SP</text>
+
+  <rect x="610" y="330" width="218" height="50" rx="6" fill="rgba(255,255,255,0.12)"/>
+  <text x="719" y="351" text-anchor="middle" fill="white" font-size="11" font-weight="bold">交叉测试 + 风险检测</text>
+  <text x="719" y="365" text-anchor="middle" fill="#AACCFF" font-size="10">SP≥1 触发交叉分配</text>
+  <text x="719" y="378" text-anchor="middle" fill="#AACCFF" font-size="10">耦合风险识别输出</text>
+
+  <!-- Arrow down -->
+  <line x1="465" y1="392" x2="465" y2="412" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- ============ OUTPUT LAYER ============ -->
+  <rect x="80" y="412" width="770" height="72" rx="10" fill="white" stroke="#3A9A3A" stroke-width="1.5" filter="url(#s)"/>
+  <text x="465" y="428" text-anchor="middle" fill="#1A5A1A" font-size="12" font-weight="bold">📤  输出层</text>
+
+  <rect x="100" y="436" width="200" height="36" rx="5" fill="#E8F8E8" stroke="#80C880" stroke-width="1"/>
+  <text x="200" y="450" text-anchor="middle" fill="#1A5A1A" font-size="11" font-weight="bold">结构化排期 Markdown</text>
+  <text x="200" y="464" text-anchor="middle" fill="#5A9A5A" font-size="10">6 章节完整方案</text>
+
+  <rect x="318" y="436" width="200" height="36" rx="5" fill="#E8F8E8" stroke="#80C880" stroke-width="1"/>
+  <text x="418" y="450" text-anchor="middle" fill="#1A5A1A" font-size="11" font-weight="bold">保存本地文件</text>
+  <text x="418" y="464" text-anchor="middle" fill="#5A9A5A" font-size="10">/tmp/7.38_test_allocation.md</text>
+
+  <rect x="536" y="436" width="296" height="36" rx="5" fill="#E8F8E8" stroke="#80C880" stroke-width="1"/>
+  <text x="684" y="450" text-anchor="middle" fill="#1A5A1A" font-size="11" font-weight="bold">自动推送 Kim 群 ✅</text>
+  <text x="684" y="464" text-anchor="middle" fill="#5A9A5A" font-size="10">broadcast.py → webhook → 快影测试群</text>
+</svg>

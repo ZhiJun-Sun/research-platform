@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 440" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.13"/></filter>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1A3060"/>
+      <stop offset="100%" style="stop-color:#3A60A0"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="440" fill="#F0F3F8"/>
+  <rect x="0" y="0" width="900" height="52" fill="url(#gTitle)"/>
+  <text x="450" y="31" text-anchor="middle" fill="white" font-size="17" font-weight="bold">Skill 边界测试矩阵</text>
+  <text x="450" y="46" text-anchor="middle" fill="#AACCFF" font-size="11">每个单元格至少 2 个测试用例：预期路径 + 边界路径</text>
+
+  <!-- Headers row -->
+  <rect x="20" y="66" width="160" height="36" rx="4" fill="#2D3E56"/>
+  <text x="100" y="89" text-anchor="middle" fill="white" font-size="11" font-weight="bold">测试维度 \ 能力</text>
+
+  <rect x="184" y="66" width="140" height="36" rx="4" fill="#2D3E56"/>
+  <text x="254" y="89" text-anchor="middle" fill="white" font-size="11">核心查询</text>
+
+  <rect x="328" y="66" width="140" height="36" rx="4" fill="#2D3E56"/>
+  <text x="398" y="89" text-anchor="middle" fill="white" font-size="11">数据分析</text>
+
+  <rect x="472" y="66" width="140" height="36" rx="4" fill="#2D3E56"/>
+  <text x="542" y="89" text-anchor="middle" fill="white" font-size="11">结果输出</text>
+
+  <rect x="616" y="66" width="140" height="36" rx="4" fill="#2D3E56"/>
+  <text x="686" y="89" text-anchor="middle" fill="white" font-size="11">追问/降级</text>
+
+  <rect x="760" y="66" width="120" height="36" rx="4" fill="#1A3060"/>
+  <text x="820" y="89" text-anchor="middle" fill="#AACCFF" font-size="11">优先级</text>
+
+  <!-- Row 1: synonym -->
+  <rect x="20" y="106" width="160" height="52" rx="4" fill="#1A5A9A"/>
+  <text x="100" y="128" text-anchor="middle" fill="white" font-size="10" font-weight="bold">同义替换</text>
+  <text x="100" y="146" text-anchor="middle" fill="#AAD0FF" font-size="9">5 种不同说法</text>
+
+  <rect x="184" y="106" width="140" height="52" rx="4" fill="#E8F2FF" stroke="#B0CCE8" stroke-width="1"/>
+  <text x="254" y="125" text-anchor="middle" fill="#2B5090" font-size="9">✅ 必测</text>
+  <text x="254" y="142" text-anchor="middle" fill="#5A7AAA" font-size="9">「逾期」「超期」「delay」</text>
+  <text x="254" y="154" text-anchor="middle" fill="#5A7AAA" font-size="9">「没按时完成」都要触发</text>
+
+  <rect x="328" y="106" width="140" height="52" rx="4" fill="#E8F2FF" stroke="#B0CCE8" stroke-width="1"/>
+  <text x="398" y="130" text-anchor="middle" fill="#2B5090" font-size="9">✅ 必测</text>
+  <text x="398" y="146" text-anchor="middle" fill="#5A7AAA" font-size="9">「分析」「看看」「说说」</text>
+
+  <rect x="472" y="106" width="140" height="52" rx="4" fill="#F8F8F8" stroke="#D0D8E4" stroke-width="1"/>
+  <text x="542" y="130" text-anchor="middle" fill="#888" font-size="9">⚡ 可选</text>
+  <text x="542" y="146" text-anchor="middle" fill="#AAA" font-size="9">输出格式通常固定</text>
+
+  <rect x="616" y="106" width="140" height="52" rx="4" fill="#E8F2FF" stroke="#B0CCE8" stroke-width="1"/>
+  <text x="686" y="130" text-anchor="middle" fill="#2B5090" font-size="9">✅ 必测</text>
+  <text x="686" y="146" text-anchor="middle" fill="#5A7AAA" font-size="9">追问触发词的多样性</text>
+
+  <rect x="760" y="106" width="120" height="52" rx="4" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="820" y="130" text-anchor="middle" fill="#C03030" font-size="10" font-weight="bold">P0</text>
+  <text x="820" y="146" text-anchor="middle" fill="#C06060" font-size="9">意图识别核心</text>
+
+  <!-- Row 2: missing info -->
+  <rect x="20" y="162" width="160" height="52" rx="4" fill="#1A5A9A"/>
+  <text x="100" y="184" text-anchor="middle" fill="white" font-size="10" font-weight="bold">信息缺失</text>
+  <text x="100" y="202" text-anchor="middle" fill="#AAD0FF" font-size="9">省略必要参数</text>
+
+  <rect x="184" y="162" width="140" height="52" rx="4" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="254" y="181" text-anchor="middle" fill="#B03030" font-size="9">⚠️ 高风险</text>
+  <text x="254" y="197" text-anchor="middle" fill="#C06060" font-size="9">无版本号时的行为</text>
+  <text x="254" y="210" text-anchor="middle" fill="#C06060" font-size="9">是追问还是用默认</text>
+
+  <rect x="328" y="162" width="140" height="52" rx="4" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="398" y="181" text-anchor="middle" fill="#B03030" font-size="9">⚠️ 高风险</text>
+  <text x="398" y="197" text-anchor="middle" fill="#C06060" font-size="9">分析范围未指定</text>
+  <text x="398" y="210" text-anchor="middle" fill="#C06060" font-size="9">默认全量还是报错</text>
+
+  <rect x="472" y="162" width="140" height="52" rx="4" fill="#F8F8F8" stroke="#D0D8E4" stroke-width="1"/>
+  <text x="542" y="193" text-anchor="middle" fill="#AAA" font-size="9">格式参数缺失</text>
+
+  <rect x="616" y="162" width="140" height="52" rx="4" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="686" y="181" text-anchor="middle" fill="#B03030" font-size="9">⚠️ 关键</text>
+  <text x="686" y="197" text-anchor="middle" fill="#C06060" font-size="9">缺失时追问措辞</text>
+  <text x="686" y="210" text-anchor="middle" fill="#C06060" font-size="9">是否清晰</text>
+
+  <rect x="760" y="162" width="120" height="52" rx="4" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="820" y="184" text-anchor="middle" fill="#C03030" font-size="10" font-weight="bold">P0</text>
+  <text x="820" y="200" text-anchor="middle" fill="#C06060" font-size="9">追问是核心机制</text>
+
+  <!-- Row 3: mixed intent -->
+  <rect x="20" y="218" width="160" height="52" rx="4" fill="#2A7A2A"/>
+  <text x="100" y="240" text-anchor="middle" fill="white" font-size="10" font-weight="bold">意图混合</text>
+  <text x="100" y="258" text-anchor="middle" fill="#AAF0AA" font-size="9">一句话多个意图</text>
+
+  <rect x="184" y="218" width="140" height="52" rx="4" fill="#E8F8E8" stroke="#90D890" stroke-width="1"/>
+  <text x="254" y="242" text-anchor="middle" fill="#1A6A1A" font-size="9">✅ 必测</text>
+  <text x="254" y="258" text-anchor="middle" fill="#3A8A3A" font-size="9">查询+分析组合</text>
+
+  <rect x="328" y="218" width="140" height="52" rx="4" fill="#E8F8E8" stroke="#90D890" stroke-width="1"/>
+  <text x="398" y="242" text-anchor="middle" fill="#1A6A1A" font-size="9">✅ 必测</text>
+  <text x="398" y="258" text-anchor="middle" fill="#3A8A3A" font-size="9">分析+建议组合</text>
+
+  <rect x="472" y="218" width="140" height="52" rx="4" fill="#F8F8F8" stroke="#D0D8E4" stroke-width="1"/>
+  <text x="542" y="242" text-anchor="middle" fill="#888" font-size="9">⚡ 可选</text>
+
+  <rect x="616" y="218" width="140" height="52" rx="4" fill="#E8F8E8" stroke="#90D890" stroke-width="1"/>
+  <text x="686" y="242" text-anchor="middle" fill="#1A6A1A" font-size="9">✅ 必测</text>
+  <text x="686" y="258" text-anchor="middle" fill="#3A8A3A" font-size="9">只能处理一个时</text>
+
+  <rect x="760" y="218" width="120" height="52" rx="4" fill="#FFF8E8" stroke="#E0C050" stroke-width="1"/>
+  <text x="820" y="240" text-anchor="middle" fill="#806020" font-size="10" font-weight="bold">P1</text>
+
+  <!-- Row 4: out of scope -->
+  <rect x="20" y="274" width="160" height="52" rx="4" fill="#7A3A1A"/>
+  <text x="100" y="296" text-anchor="middle" fill="white" font-size="10" font-weight="bold">超出能力范围</text>
+  <text x="100" y="314" text-anchor="middle" fill="#FFCCAA" font-size="9">Skill 做不到的事</text>
+
+  <rect x="184" y="274" width="140" height="52" rx="4" fill="#FFF0E8" stroke="#E0B080" stroke-width="1"/>
+  <text x="254" y="293" text-anchor="middle" fill="#7A3A1A" font-size="9">🔴 必测</text>
+  <text x="254" y="309" text-anchor="middle" fill="#AA6A3A" font-size="9">修改/写入操作</text>
+  <text x="254" y="322" text-anchor="middle" fill="#AA6A3A" font-size="9">应降级说明</text>
+
+  <rect x="328" y="274" width="140" height="52" rx="4" fill="#FFF0E8" stroke="#E0B080" stroke-width="1"/>
+  <text x="398" y="293" text-anchor="middle" fill="#7A3A1A" font-size="9">🔴 必测</text>
+  <text x="398" y="309" text-anchor="middle" fill="#AA6A3A" font-size="9">需要跨系统数据</text>
+
+  <rect x="472" y="274" width="140" height="52" rx="4" fill="#FFF0E8" stroke="#E0B080" stroke-width="1"/>
+  <text x="542" y="309" text-anchor="middle" fill="#AA6A3A" font-size="9">特殊格式要求</text>
+
+  <rect x="616" y="274" width="140" height="52" rx="4" fill="#FFF0E8" stroke="#E0B080" stroke-width="1"/>
+  <text x="686" y="293" text-anchor="middle" fill="#7A3A1A" font-size="9">🔴 核心</text>
+  <text x="686" y="309" text-anchor="middle" fill="#AA6A3A" font-size="9">降级方案的质量</text>
+
+  <rect x="760" y="274" width="120" height="52" rx="4" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="820" y="296" text-anchor="middle" fill="#C03030" font-size="10" font-weight="bold">P0</text>
+  <text x="820" y="312" text-anchor="middle" fill="#C06060" font-size="9">信任来源</text>
+
+  <!-- Row 5: extreme -->
+  <rect x="20" y="330" width="160" height="52" rx="4" fill="#555"/>
+  <text x="100" y="352" text-anchor="middle" fill="white" font-size="10" font-weight="bold">极端/异常输入</text>
+  <text x="100" y="370" text-anchor="middle" fill="#CCCCCC" font-size="9">边界值/矛盾输入</text>
+
+  <rect x="184" y="330" width="140" height="52" rx="4" fill="#F4F4F4" stroke="#CCCCCC" stroke-width="1"/>
+  <text x="254" y="354" text-anchor="middle" fill="#555" font-size="9">空值/无效版本</text>
+  <text x="254" y="370" text-anchor="middle" fill="#888" font-size="9">不应崩溃或乱答</text>
+
+  <rect x="328" y="330" width="140" height="52" rx="4" fill="#F4F4F4" stroke="#CCCCCC" stroke-width="1"/>
+  <text x="398" y="354" text-anchor="middle" fill="#555" font-size="9">数据量极大/极小</text>
+
+  <rect x="472" y="330" width="140" height="52" rx="4" fill="#F4F4F4" stroke="#CCCCCC" stroke-width="1"/>
+  <text x="542" y="354" text-anchor="middle" fill="#555" font-size="9">特殊字符/超长输入</text>
+
+  <rect x="616" y="330" width="140" height="52" rx="4" fill="#F4F4F4" stroke="#CCCCCC" stroke-width="1"/>
+  <text x="686" y="354" text-anchor="middle" fill="#555" font-size="9">前后矛盾的输入</text>
+
+  <rect x="760" y="330" width="120" height="52" rx="4" fill="#F8F8F8" stroke="#CCCCCC" stroke-width="1"/>
+  <text x="820" y="352" text-anchor="middle" fill="#888" font-size="10" font-weight="bold">P2</text>
+  <text x="820" y="368" text-anchor="middle" fill="#AAA" font-size="9">防御性设计</text>
+
+  <!-- Legend -->
+  <rect x="20" y="396" width="860" height="32" rx="6" fill="white"/>
+  <rect x="32" y="406" width="12" height="12" rx="2" fill="#FFF0F0" stroke="#F0A0A0" stroke-width="1"/>
+  <text x="50" y="416" fill="#888" font-size="9">P0：发布前必须全覆盖</text>
+  <rect x="200" y="406" width="12" height="12" rx="2" fill="#FFF8E8" stroke="#E0C050" stroke-width="1"/>
+  <text x="218" y="416" fill="#888" font-size="9">P1：发布前覆盖 80%</text>
+  <rect x="360" y="406" width="12" height="12" rx="2" fill="#F8F8F8" stroke="#CCCCCC" stroke-width="1"/>
+  <text x="378" y="416" fill="#888" font-size="9">P2：首版后迭代覆盖</text>
+  <rect x="520" y="406" width="12" height="12" rx="2" fill="#F0F0F0" stroke="#C0C0C0" stroke-width="1"/>
+  <text x="538" y="416" fill="#888" font-size="9">⚡ 可选：根据实际使用场景判断</text>
+</svg>

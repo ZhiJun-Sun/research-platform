@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# HydroLab 本地数据与密钥
+.hydrolab-data/
+.env
+
+# Node / 前端
+node_modules/
+apps/web/dist/
+
+# 系统
+.DS_Store

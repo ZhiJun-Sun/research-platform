@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="Microsoft YaHei, PingFang SC, sans-serif">
+  <defs>
+    <filter id="s"><feDropShadow dx="1" dy="2" stdDeviation="3" flood-opacity="0.13"/></filter>
+    <filter id="s2"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/></filter>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1A3060"/>
+      <stop offset="100%" style="stop-color:#3A60A0"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="480" fill="#F0F3F8"/>
+  <rect x="0" y="0" width="900" height="52" fill="url(#gTitle)"/>
+  <text x="450" y="31" text-anchor="middle" fill="white" font-size="17" font-weight="bold">意图的三个层次</text>
+  <text x="450" y="46" text-anchor="middle" fill="#AACCFF" font-size="11">表面意图是起点，而不是终点</text>
+
+  <!-- Outer shell: implied intent -->
+  <ellipse cx="450" cy="280" rx="400" ry="176" fill="#FFF4E8" stroke="#E8A050" stroke-width="2" filter="url(#s)"/>
+  <text x="450" y="128" text-anchor="middle" fill="#805010" font-size="13" font-weight="bold">隐含意图（用户没说、但期望被照顾到的）</text>
+  <text x="450" y="146" text-anchor="middle" fill="#A07030" font-size="10">决定 Skill 是否被认为「聪明」</text>
+  <!-- implied examples -->
+  <text x="100" y="310" fill="#A07030" font-size="10" text-anchor="middle">P0 问题自动标红</text>
+  <text x="100" y="328" fill="#A07030" font-size="10" text-anchor="middle">异常时主动预警</text>
+  <text x="800" y="310" fill="#A07030" font-size="10" text-anchor="middle">格式符合团队习惯</text>
+  <text x="800" y="328" fill="#A07030" font-size="10" text-anchor="middle">延伸分析关联影响</text>
+
+  <!-- Middle shell: actual intent -->
+  <ellipse cx="450" cy="280" rx="290" ry="126" fill="#E8F2FF" stroke="#5B8DD9" stroke-width="2" filter="url(#s2)"/>
+  <text x="450" y="190" text-anchor="middle" fill="#1A4A90" font-size="13" font-weight="bold">实际意图（用户为什么要做这件事）</text>
+  <text x="450" y="208" text-anchor="middle" fill="#3A6AB0" font-size="10">决定「怎么呈现」和「呈现什么」</text>
+  <!-- actual examples -->
+  <text x="220" y="290" fill="#3A6AB0" font-size="10" text-anchor="middle">评估发版风险</text>
+  <text x="220" y="308" fill="#3A6AB0" font-size="10" text-anchor="middle">→ 突出 blockers</text>
+  <text x="680" y="290" fill="#3A6AB0" font-size="10" text-anchor="middle">准备汇报</text>
+  <text x="680" y="308" fill="#3A6AB0" font-size="10" text-anchor="middle">→ 结论性语言</text>
+
+  <!-- Inner: surface intent -->
+  <ellipse cx="450" cy="280" rx="160" ry="76" fill="#2D3E56" filter="url(#s2)"/>
+  <text x="450" y="266" text-anchor="middle" fill="white" font-size="13" font-weight="bold">表面意图</text>
+  <text x="450" y="284" text-anchor="middle" fill="#AACCFF" font-size="10">用户说出来的、直接可执行的</text>
+  <text x="450" y="300" text-anchor="middle" fill="#88AACC" font-size="10">「查延期需求」「生成报告」</text>
+  <text x="450" y="316" text-anchor="middle" fill="#88AACC" font-size="9">大多数 Skill 止步于此</text>
+
+  <!-- Right annotation -->
+  <rect x="20" y="380" width="860" height="82" rx="10" fill="white" filter="url(#s2)"/>
+  <rect x="20" y="380" width="270" height="82" rx="10" fill="#2D3E56"/>
+  <text x="155" y="400" text-anchor="middle" fill="#AACCFF" font-size="10" font-weight="bold">表面意图</text>
+  <text x="155" y="418" text-anchor="middle" fill="white" font-size="11">告诉 Skill：</text>
+  <text x="155" y="434" text-anchor="middle" fill="#88AACC" font-size="11" font-weight="bold">做什么</text>
+  <text x="155" y="453" text-anchor="middle" fill="#88AACC" font-size="10">有用，但不够</text>
+
+  <rect x="310" y="380" width="270" height="82" rx="10" fill="#1A5A9A"/>
+  <text x="445" y="400" text-anchor="middle" fill="#AACCFF" font-size="10" font-weight="bold">实际意图</text>
+  <text x="445" y="418" text-anchor="middle" fill="white" font-size="11">告诉 Skill：</text>
+  <text x="445" y="434" text-anchor="middle" fill="#88AACC" font-size="11" font-weight="bold">为什么做</text>
+  <text x="445" y="453" text-anchor="middle" fill="#88AACC" font-size="10">让输出真正有价值</text>
+
+  <rect x="600" y="380" width="280" height="82" rx="10" fill="#804A10"/>
+  <text x="740" y="400" text-anchor="middle" fill="#FFCCA0" font-size="10" font-weight="bold">隐含意图</text>
+  <text x="740" y="418" text-anchor="middle" fill="white" font-size="11">告诉 Skill：</text>
+  <text x="740" y="434" text-anchor="middle" fill="#FFD0A0" font-size="11" font-weight="bold">做到什么程度</text>
+  <text x="740" y="453" text-anchor="middle" fill="#FFD0A0" font-size="10">让用户觉得「它懂我」</text>
+</svg>

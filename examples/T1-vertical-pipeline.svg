@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 800" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#5B7FA8"/>
+    </marker>
+    <marker id="arrO" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#CC6810"/>
+    </marker>
+    <marker id="arrG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4A904A"/>
+    </marker>
+    <filter id="sd">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0000001A"/>
+    </filter>
+    <linearGradient id="gInput" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5B8DD9"/>
+      <stop offset="100%" style="stop-color:#3A6BB8"/>
+    </linearGradient>
+    <linearGradient id="gAI" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9B6DC8"/>
+      <stop offset="100%" style="stop-color:#7A52AB"/>
+    </linearGradient>
+    <linearGradient id="gModule" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E8F2FF"/>
+      <stop offset="100%" style="stop-color:#D4E6FA"/>
+    </linearGradient>
+    <linearGradient id="gModuleAI" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F2ECFA"/>
+      <stop offset="100%" style="stop-color:#E4D8F4"/>
+    </linearGradient>
+    <linearGradient id="gModuleOrange" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF4E8"/>
+      <stop offset="100%" style="stop-color:#FDEBD4"/>
+    </linearGradient>
+    <linearGradient id="gOut" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3A9A3A"/>
+      <stop offset="100%" style="stop-color:#2A7A2A"/>
+    </linearGradient>
+    <linearGradient id="gBG" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F3F6FB"/>
+      <stop offset="100%" style="stop-color:#EAF0F8"/>
+    </linearGradient>
+    <linearGradient id="gTitle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2B5090"/>
+      <stop offset="100%" style="stop-color:#4472C4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ===== 背景 ===== -->
+  <rect width="960" height="800" fill="url(#gBG)" rx="14"/>
+
+  <!-- ===== 顶部标题栏 ===== -->
+  <rect x="30" y="18" width="900" height="52" rx="10" fill="url(#gTitle)" filter="url(#sd)"/>
+  <text x="480" y="50" text-anchor="middle" fill="white" font-size="21" font-weight="bold" letter-spacing="3">模板广告自动化生成 — 整体流程架构</text>
+
+  <!-- =====================================================
+       第一行：输入层
+  ====================================================== -->
+  <text x="46" y="102" fill="#5B7FA8" font-size="12" font-weight="bold">① 输入</text>
+
+  <rect x="215" y="86" width="530" height="52" rx="10" fill="url(#gInput)" filter="url(#sd)"/>
+  <rect x="230" y="98" width="88" height="28" rx="6" fill="rgba(255,255,255,0.22)"/>
+  <text x="274" y="116" text-anchor="middle" fill="white" font-size="11">模板原始视频</text>
+  <rect x="328" y="98" width="88" height="28" rx="6" fill="rgba(255,255,255,0.22)"/>
+  <text x="372" y="116" text-anchor="middle" fill="white" font-size="11">模板标题</text>
+  <rect x="426" y="98" width="88" height="28" rx="6" fill="rgba(255,255,255,0.22)"/>
+  <text x="470" y="116" text-anchor="middle" fill="white" font-size="11">模板描述</text>
+  <rect x="524" y="98" width="88" height="28" rx="6" fill="rgba(255,255,255,0.22)"/>
+  <text x="568" y="116" text-anchor="middle" fill="white" font-size="11">OCR</text>
+  <rect x="622" y="98" width="88" height="28" rx="6" fill="rgba(255,255,255,0.22)"/>
+  <text x="666" y="116" text-anchor="middle" fill="white" font-size="11">ASR</text>
+
+  <!-- 箭头 1→2 -->
+  <line x1="480" y1="138" x2="480" y2="158" stroke="#5B7FA8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- =====================================================
+       第二行：AI文案生成
+  ====================================================== -->
+  <text x="46" y="180" fill="#7A52AB" font-size="12" font-weight="bold">② AI</text>
+
+  <rect x="215" y="160" width="530" height="60" rx="10" fill="url(#gAI)" filter="url(#sd)"/>
+  <text x="480" y="186" text-anchor="middle" fill="white" font-size="14" font-weight="bold">AI 文案生成（LLM）</text>
+  <text x="480" y="207" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="11">基于模板多模态信息，生成片头文案、各段引导语、片尾文案</text>
+
+  <!-- 箭头 2→3 -->
+  <line x1="480" y1="220" x2="480" y2="240" stroke="#5B7FA8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- =====================================================
+       第三行：五大模块（模块高度增至170）
+  ====================================================== -->
+  <rect x="30" y="240" width="900" height="270" rx="12" fill="white" stroke="#C8D8EC" stroke-width="1.5" filter="url(#sd)"/>
+  <rect x="30" y="240" width="900" height="40" rx="12" fill="#EFF4FB"/>
+  <rect x="30" y="260" width="900" height="20" fill="#EFF4FB"/>
+  <text x="46" y="267" fill="#5B7FA8" font-size="12" font-weight="bold">③ 五大视频模块（按时间轴顺序）</text>
+
+  <!-- 时间轴条 -->
+  <rect x="55" y="286" width="848" height="18" rx="9" fill="#DDE8F4"/>
+  <rect x="55" y="286" width="170" height="18" rx="9" fill="#B088D4" opacity="0.7"/>
+  <text x="140" y="299" text-anchor="middle" fill="white" font-size="10" font-weight="bold">片头  0–10s</text>
+  <rect x="225" y="286" width="510" height="18" rx="0" fill="#5B8DD9" opacity="0.6"/>
+  <text x="480" y="299" text-anchor="middle" fill="white" font-size="10" font-weight="bold">模板介绍  10–23s</text>
+  <rect x="735" y="286" width="168" height="18" rx="9" fill="#B088D4" opacity="0.7"/>
+  <text x="819" y="299" text-anchor="middle" fill="white" font-size="10" font-weight="bold">片尾  24–27s</text>
+
+  <!-- ===== 模块1: 片头 ===== -->
+  <rect x="55" y="310" width="170" height="170" rx="10" fill="url(#gModuleAI)" stroke="#B088D4" stroke-width="1.8" filter="url(#sd)"/>
+  <rect x="55" y="310" width="170" height="36" rx="10" fill="#B088D4"/>
+  <rect x="55" y="332" width="170" height="14" fill="#B088D4"/>
+  <text x="140" y="334" text-anchor="middle" fill="white" font-size="13" font-weight="bold">模板片头</text>
+  <rect x="188" y="313" width="28" height="16" rx="8" fill="#E8609A"/>
+  <text x="202" y="325" text-anchor="middle" fill="white" font-size="9" font-weight="bold">AI✦</text>
+
+  <text x="140" y="366" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">画面素材</text>
+  <rect x="72" y="374" width="136" height="26" rx="5" fill="white" stroke="#C8A8E8" stroke-width="1"/>
+  <text x="140" y="391" text-anchor="middle" fill="#555" font-size="10">模板视频截取（0–10s）</text>
+
+  <text x="140" y="420" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">AI生成文案</text>
+  <rect x="72" y="428" width="136" height="26" rx="5" fill="white" stroke="#C8A8E8" stroke-width="1"/>
+  <text x="140" y="445" text-anchor="middle" fill="#7A52AB" font-size="10">片头引导文案</text>
+
+  <!-- 竖分隔 -->
+  <line x1="225" y1="312" x2="225" y2="475" stroke="#C8D8EC" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- ===== 模块2: Feed流引导 ===== -->
+  <rect x="235" y="310" width="160" height="170" rx="10" fill="url(#gModule)" stroke="#84B0DC" stroke-width="1.8" filter="url(#sd)"/>
+  <rect x="235" y="310" width="160" height="36" rx="10" fill="#5B8DD9"/>
+  <rect x="235" y="332" width="160" height="14" fill="#5B8DD9"/>
+  <text x="315" y="334" text-anchor="middle" fill="white" font-size="12" font-weight="bold">Feed流引导</text>
+
+  <text x="315" y="368" text-anchor="middle" fill="#3A5A8A" font-size="11" font-weight="bold">画面素材</text>
+  <rect x="250" y="376" width="130" height="26" rx="5" fill="white" stroke="#A8C8E8" stroke-width="1"/>
+  <text x="315" y="393" text-anchor="middle" fill="#555" font-size="10">feed流滑动视频（库随机）</text>
+
+  <text x="315" y="420" text-anchor="middle" fill="#3A5A8A" font-size="11" font-weight="bold">固定文案</text>
+  <rect x="250" y="428" width="130" height="40" rx="5" fill="white" stroke="#A8C8E8" stroke-width="1"/>
+  <text x="315" y="444" text-anchor="middle" fill="#4472C4" font-size="9.5">"海量模板任你选，</text>
+  <text x="315" y="460" text-anchor="middle" fill="#4472C4" font-size="9.5">搜索{{TITLE}}"</text>
+
+  <!-- ===== 模块3: 模板详情页 ===== -->
+  <rect x="405" y="310" width="160" height="170" rx="10" fill="url(#gModule)" stroke="#84B0DC" stroke-width="1.8" filter="url(#sd)"/>
+  <rect x="405" y="310" width="160" height="36" rx="10" fill="#5B8DD9"/>
+  <rect x="405" y="332" width="160" height="14" fill="#5B8DD9"/>
+  <text x="485" y="334" text-anchor="middle" fill="white" font-size="12" font-weight="bold">模板详情页</text>
+
+  <text x="485" y="368" text-anchor="middle" fill="#3A5A8A" font-size="11" font-weight="bold">画面素材</text>
+  <rect x="420" y="376" width="130" height="42" rx="5" fill="white" stroke="#A8C8E8" stroke-width="1"/>
+  <text x="485" y="393" text-anchor="middle" fill="#555" font-size="10">模板封面图</text>
+  <text x="485" y="409" text-anchor="middle" fill="#555" font-size="10">+ 制作同款按钮贴纸</text>
+
+  <text x="485" y="436" text-anchor="middle" fill="#3A5A8A" font-size="11" font-weight="bold">固定文案</text>
+  <rect x="420" y="444" width="130" height="26" rx="5" fill="white" stroke="#A8C8E8" stroke-width="1"/>
+  <text x="485" y="461" text-anchor="middle" fill="#4472C4" font-size="10">"点击制作同款"</text>
+
+  <!-- ===== 模块4: 选图页 ===== -->
+  <rect x="575" y="310" width="160" height="170" rx="10" fill="url(#gModule)" stroke="#84B0DC" stroke-width="1.8" filter="url(#sd)"/>
+  <rect x="575" y="310" width="160" height="36" rx="10" fill="#5B8DD9"/>
+  <rect x="575" y="332" width="160" height="14" fill="#5B8DD9"/>
+  <text x="655" y="334" text-anchor="middle" fill="white" font-size="12" font-weight="bold">选图页展示</text>
+
+  <text x="655" y="368" text-anchor="middle" fill="#3A5A8A" font-size="11" font-weight="bold">画面素材</text>
+  <rect x="590" y="376" width="130" height="42" rx="5" fill="white" stroke="#A8C8E8" stroke-width="1"/>
+  <text x="655" y="393" text-anchor="middle" fill="#555" font-size="10">选图页视频</text>
+  <text x="655" y="409" text-anchor="middle" fill="#555" font-size="10">+ 模板成片预览</text>
+
+  <text x="655" y="436" text-anchor="middle" fill="#3A5A8A" font-size="11" font-weight="bold">固定文案</text>
+  <rect x="590" y="444" width="130" height="40" rx="5" fill="white" stroke="#A8C8E8" stroke-width="1"/>
+  <text x="655" y="460" text-anchor="middle" fill="#4472C4" font-size="9.5">"选择照片/视频素材，</text>
+  <text x="655" y="476" text-anchor="middle" fill="#4472C4" font-size="9.5">系统自动生成成片"</text>
+
+  <!-- 竖分隔 -->
+  <line x1="735" y1="312" x2="735" y2="475" stroke="#C8D8EC" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- ===== 模块5: 片尾 ===== -->
+  <rect x="745" y="310" width="160" height="170" rx="10" fill="url(#gModuleAI)" stroke="#B088D4" stroke-width="1.8" filter="url(#sd)"/>
+  <rect x="745" y="310" width="160" height="36" rx="10" fill="#B088D4"/>
+  <rect x="745" y="332" width="160" height="14" fill="#B088D4"/>
+  <text x="825" y="334" text-anchor="middle" fill="white" font-size="12" font-weight="bold">片尾</text>
+  <rect x="862" y="313" width="28" height="16" rx="8" fill="#E8609A"/>
+  <text x="876" y="325" text-anchor="middle" fill="white" font-size="9" font-weight="bold">AI✦</text>
+
+  <text x="825" y="368" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">画面素材</text>
+  <rect x="760" y="376" width="130" height="26" rx="5" fill="white" stroke="#C8A8E8" stroke-width="1"/>
+  <text x="825" y="393" text-anchor="middle" fill="#555" font-size="10">片尾素材库随机抽取</text>
+
+  <text x="825" y="420" text-anchor="middle" fill="#5A3A8A" font-size="11" font-weight="bold">AI生成文案</text>
+  <rect x="760" y="428" width="130" height="26" rx="5" fill="white" stroke="#C8A8E8" stroke-width="1"/>
+  <text x="825" y="445" text-anchor="middle" fill="#7A52AB" font-size="10">结束语 / 行动号召 ≤20字</text>
+
+  <!-- 箭头 3→4 -->
+  <line x1="480" y1="510" x2="480" y2="530" stroke="#CC6810" stroke-width="2" marker-end="url(#arrO)"/>
+
+  <!-- =====================================================
+       第四行：合成区域（与③同结构：白框+标题条，④圆圈在左上）
+  ====================================================== -->
+
+  <!-- 合成大框 -->
+  <rect x="30" y="532" width="900" height="150" rx="12" fill="white" stroke="#E0A060" stroke-width="1.5" filter="url(#sd)"/>
+  <!-- 标题条 -->
+  <rect x="30" y="532" width="900" height="38" rx="12" fill="#FEF0DC"/>
+  <rect x="30" y="552" width="900" height="18" fill="#FEF0DC"/>
+  <text x="46" y="558" fill="#CC6810" font-size="12" font-weight="bold">④ 合成</text>
+
+  <!-- ===== 子块1: 预制素材 ===== -->
+  <rect x="46" y="578" width="270" height="94" rx="10" fill="url(#gModuleOrange)" stroke="#E0A060" stroke-width="1.5" filter="url(#sd)"/>
+  <rect x="46" y="578" width="270" height="30" rx="10" fill="#D4943C"/>
+  <rect x="46" y="596" width="270" height="12" fill="#D4943C"/>
+  <text x="181" y="598" text-anchor="middle" fill="white" font-size="12" font-weight="bold">预制素材</text>
+  <rect x="60" y="616" width="115" height="24" rx="5" fill="white" stroke="#E0A060" stroke-width="1"/>
+  <text x="117" y="632" text-anchor="middle" fill="#8A6020" font-size="10">模板封面</text>
+  <rect x="185" y="616" width="115" height="24" rx="5" fill="white" stroke="#E0A060" stroke-width="1"/>
+  <text x="242" y="632" text-anchor="middle" fill="#8A6020" font-size="10">片尾素材库</text>
+  <rect x="60" y="647" width="115" height="22" rx="5" fill="white" stroke="#E0A060" stroke-width="1"/>
+  <text x="117" y="662" text-anchor="middle" fill="#8A6020" font-size="10">feed流视频库</text>
+  <rect x="185" y="647" width="115" height="22" rx="5" fill="white" stroke="#E0A060" stroke-width="1"/>
+  <text x="242" y="662" text-anchor="middle" fill="#8A6020" font-size="10">选图页视频</text>
+
+  <!-- 箭头 子块1→子块2 -->
+  <line x1="320" y1="625" x2="350" y2="625" stroke="#CC6810" stroke-width="1.5" marker-end="url(#arrO)"/>
+
+  <!-- ===== 子块2: TTS + 字幕叠加 ===== -->
+  <rect x="356" y="578" width="230" height="94" rx="10" fill="url(#gModuleAI)" stroke="#B088D4" stroke-width="1.5" filter="url(#sd)"/>
+  <rect x="356" y="578" width="230" height="30" rx="10" fill="#9B7BBE"/>
+  <rect x="356" y="596" width="230" height="12" fill="#9B7BBE"/>
+  <text x="471" y="598" text-anchor="middle" fill="white" font-size="12" font-weight="bold">TTS + 字幕叠加</text>
+  <rect x="372" y="618" width="198" height="24" rx="5" fill="white" stroke="#C8A8E8" stroke-width="1"/>
+  <text x="471" y="634" text-anchor="middle" fill="#5A3A8A" font-size="10">语音合成（TTS）</text>
+  <rect x="372" y="650" width="198" height="20" rx="5" fill="white" stroke="#C8A8E8" stroke-width="1"/>
+  <text x="471" y="664" text-anchor="middle" fill="#5A3A8A" font-size="10">字幕轨道叠加</text>
+
+  <!-- 箭头 子块2→子块3 -->
+  <line x1="590" y1="625" x2="620" y2="625" stroke="#CC6810" stroke-width="1.5" marker-end="url(#arrO)"/>
+
+  <!-- ===== 子块3: 混剪合成 ===== -->
+  <rect x="626" y="578" width="288" height="94" rx="10" fill="url(#gModuleOrange)" stroke="#E0A060" stroke-width="1.5" filter="url(#sd)"/>
+  <rect x="626" y="578" width="288" height="30" rx="10" fill="#D4943C"/>
+  <rect x="626" y="596" width="288" height="12" fill="#D4943C"/>
+  <text x="770" y="598" text-anchor="middle" fill="white" font-size="12" font-weight="bold">混剪合成</text>
+  <rect x="642" y="618" width="256" height="24" rx="5" fill="white" stroke="#E0A060" stroke-width="1"/>
+  <text x="770" y="634" text-anchor="middle" fill="#8A6020" font-size="10">音视频轨道合并对齐</text>
+  <rect x="642" y="650" width="256" height="20" rx="5" fill="white" stroke="#E0A060" stroke-width="1"/>
+  <text x="770" y="664" text-anchor="middle" fill="#8A6020" font-size="10">生成完整时间轴</text>
+
+  <!-- 箭头 4→5 -->
+  <line x1="480" y1="682" x2="480" y2="702" stroke="#4A904A" stroke-width="2" marker-end="url(#arrG)"/>
+
+  <!-- =====================================================
+       第五行：最终输出
+  ====================================================== -->
+  <text x="46" y="726" fill="#3A9A3A" font-size="12" font-weight="bold">⑤ 输出</text>
+
+  <rect x="215" y="704" width="530" height="72" rx="10" fill="url(#gOut)" filter="url(#sd)"/>
+  <text x="480" y="730" text-anchor="middle" fill="white" font-size="15" font-weight="bold">✦  模板广告成片视频  ✦</text>
+  <rect x="233" y="740" width="144" height="26" rx="6" fill="rgba(255,255,255,0.18)"/>
+  <text x="305" y="757" text-anchor="middle" fill="white" font-size="11">片头（0–10s）</text>
+  <rect x="393" y="740" width="174" height="26" rx="6" fill="rgba(255,255,255,0.18)"/>
+  <text x="480" y="757" text-anchor="middle" fill="white" font-size="11">模板介绍（10–23s）</text>
+  <rect x="583" y="740" width="144" height="26" rx="6" fill="rgba(255,255,255,0.18)"/>
+  <text x="655" y="757" text-anchor="middle" fill="white" font-size="11">片尾（24–27s）</text>
+
+</svg>
