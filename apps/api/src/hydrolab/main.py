@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from hydrolab import __version__
+from hydrolab.adapters.fake.run_executor import FakeRunExecutor
+from hydrolab.adapters.fake.task_queue import FakeTaskQueue
 from hydrolab.api.container import build_repositories, build_services
 from hydrolab.api.deps import get_object_storage
 from hydrolab.api.routes import api_v1_router
@@ -40,6 +42,14 @@ from hydrolab.datasets.memory import (
     InMemoryFolderRepository,
     InMemoryImportJobRepository,
 )
+from hydrolab.execution.memory import (
+    InMemoryExecutions,
+    InMemoryGpuLeases,
+    InMemoryLogs,
+    InMemoryResourceSamples,
+    InMemoryRunEvents,
+)
+from hydrolab.execution.service import RunControlService
 from hydrolab.experiments.memory import (
     InMemoryDrafts,
     InMemoryExperiments,
@@ -135,6 +145,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.environment_versions,
         repos.grants,
         services.policy,
+    )
+
+    # B5/B6：Fake 控制与观测面。真实 Celery/Docker/Redis/MLflow 后续替换 Adapter。
+    app.state.gpu_leases = InMemoryGpuLeases(gpu_count=2)
+    app.state.executions = InMemoryExecutions()
+    app.state.run_events = InMemoryRunEvents()
+    app.state.run_logs = InMemoryLogs()
+    app.state.resource_samples = InMemoryResourceSamples()
+    app.state.run_control_service = RunControlService(
+        app.state.runs,
+        app.state.outbox,
+        app.state.gpu_leases,
+        app.state.executions,
+        app.state.run_events,
+        app.state.run_logs,
+        app.state.resource_samples,
+        FakeTaskQueue(),
+        FakeRunExecutor(),
     )
 
     # 首个管理员 bootstrap：仅系统无用户时执行一次

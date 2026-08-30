@@ -1,7 +1,7 @@
 # HydroLab 后端实施路线与验收计划
 
 > 状态：Confirmed  
-> 当前阶段：B0 骨架、B1 身份/邀请/授权/分享、B2 文件夹/导入/不可变版本、B3 代码/模板/环境资产、B4 实验草稿/版本/Run 元数据已完成（2026-08-30，InMemory Repository 基线，78 项测试通过）；B5 待启动
+> 当前阶段：B0 骨架、B1 身份/邀请/授权/分享、B2 文件夹/导入/不可变版本、B3 代码/模板/环境资产、B4 实验草稿/版本/Run 元数据、B5/B6 Fake Runner/观测基线已完成（2026-08-30，InMemory Repository 基线，81 项测试通过）；B7 待启动
 > 目标：按定版交互原型建立可部署、可迁移、可测试的真实后端。
 
 ## 1. 实施前检查清单
@@ -158,6 +158,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### B5：最小 Runner、队列和双 GPU 租约
 
+> 状态：Fake-first 基线已完成（B6 观测能力一并完成，81 项测试通过；Celery/Redis、Docker/NVIDIA Container Toolkit 与真实 GPU 安全验收待云端环境）
+
 **实现**
 
 - 仅允许仓库内 `examples/minimal-lstm` 首先跑通。
@@ -175,6 +177,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 - 容器不能读取其他 Run 或宿主敏感目录。
 
 ### B6：进度、日志、指标与 MLflow
+
+> 状态：Fake-first Run Event / 日志 / 资源采样 / SSE 基线已完成（MLflowTrackingAdapter、持久化事件与分布式恢复待真实基础设施阶段）
 
 **实现**
 

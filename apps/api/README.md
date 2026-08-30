@@ -132,6 +132,28 @@ GET       /api/v1/runs/{id}/stages
 
 提交时服务端校验全部输入版本为 `READY`、模板与代码版本关联一致、参数符合 Template Schema、资源授权有效；随后保存含输入 hash、argv、环境 hash 和最终参数的 `resolved_config` / `config_hash`。同一幂等键只创建一个 Run；提交后的 Draft 不可修改。
 
+## B5/B6 已实现：Fake Runner、双 GPU 租约与实时观测基线
+
+B5/B6 将 B4 创建的 `run.requested` 事件接入本地 Fake 控制面。它不会执行用户代码或启动 Docker，但已验证完整的运行控制与前端实时读取协议：
+
+```text
+Fake Outbox → FakeTaskQueue → GPU Lease（2 卡） → FakeRunExecutor
+→ QUEUED / PREPARING / RUNNING / SUCCEEDED | FAILED | CANCELLED
+→ Run Event / 日志 / 指标 / 资源采样 → REST / SSE
+```
+
+```text
+POST /api/v1/internal/outbox/dispatch
+POST /api/v1/runs/{id}/start|cancel
+POST /api/v1/internal/runs/{id}/complete|progress|metrics|resources
+GET  /api/v1/runs/{id}/events?after_id=N
+GET  /api/v1/runs/{id}/events/stream     # Last-Event-ID 恢复
+GET  /api/v1/runs/{id}/logs?after_id=N
+GET  /api/v1/runs/{id}/resources
+```
+
+GPU lease 在 Run 成功、失败或取消时释放；资源不足时拒绝启动，避免重复占用。事件流使用已有 `run-event-v1` 协议，SSE 支持 `Last-Event-ID` 游标恢复。当前内存实现仅用于无基础设施联调；B5/B6 的真实接入仍需要 Celery/Redis、Docker/NVIDIA、MLflow 和持久化事件存储。
+
 ## 切换到真实服务
 
 按 `plans/05` 的 Spike 门禁逐个启用（见 `infra/README.md` 与 `.env.example`）。
