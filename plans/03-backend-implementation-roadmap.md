@@ -1,7 +1,7 @@
 # HydroLab 后端实施路线与验收计划
 
 > 状态：Confirmed  
-> 当前阶段：B0 骨架、B1 身份/邀请/授权/分享、B2 文件夹/导入/不可变版本已完成（2026-08-30，InMemory Repository 基线，71 项测试通过）；B3 待启动
+> 当前阶段：B0 骨架、B1 身份/邀请/授权/分享、B2 文件夹/导入/不可变版本、B3 代码/模板/环境资产已完成（2026-08-30，InMemory Repository 基线，75 项测试通过）；B4 待启动
 > 目标：按定版交互原型建立可部署、可迁移、可测试的真实后端。
 
 ## 1. 实施前检查清单
@@ -117,6 +117,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 - 跨用户无法下载、搜索或通过对象 key 猜测资源。
 
 ### B3：代码、模板与环境资产
+
+> 状态：已完成（InMemory + Fake/Local ObjectStorage 基线，75 项测试通过；Git clone、异步镜像构建、代码安全扫描与 SQL Repository 随隔离 Worker/真实环境接入）
 
 **实现**
 

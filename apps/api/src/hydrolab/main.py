@@ -14,6 +14,17 @@ from hydrolab.api.container import build_repositories, build_services
 from hydrolab.api.deps import get_object_storage
 from hydrolab.api.routes import api_v1_router
 from hydrolab.api.routes.health import router as health_router
+from hydrolab.code_assets.imports import CodeImportService
+from hydrolab.code_assets.memory import (
+    InMemoryCodeRepositories,
+    InMemoryCodeVersions,
+    InMemoryEnvironments,
+    InMemoryEnvironmentVersions,
+    InMemoryPresets,
+    InMemoryTemplates,
+    InMemoryTemplateVersions,
+)
+from hydrolab.code_assets.services import TemplateEnvironmentService
 from hydrolab.core.errors import register_error_handlers
 from hydrolab.core.logging import configure_logging, get_logger, log_with
 from hydrolab.core.middleware import RequestContextMiddleware
@@ -66,6 +77,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.field_mappings,
         app.state.artifacts,
         storage,
+        services.policy,
+    )
+
+    # B3 代码、模板、运行环境：同样保持进程内版本仓储，未来替换为 SQL 实现。
+    app.state.code_repositories = InMemoryCodeRepositories()
+    app.state.code_versions = InMemoryCodeVersions()
+    app.state.templates = InMemoryTemplates()
+    app.state.template_versions = InMemoryTemplateVersions()
+    app.state.environments = InMemoryEnvironments()
+    app.state.environment_versions = InMemoryEnvironmentVersions()
+    app.state.parameter_presets = InMemoryPresets()
+    app.state.code_import_service = CodeImportService(
+        app.state.code_repositories,
+        app.state.code_versions,
+        repos.grants,
+        storage,
+        services.policy,
+    )
+    app.state.template_environment_service = TemplateEnvironmentService(
+        app.state.code_versions,
+        app.state.templates,
+        app.state.template_versions,
+        app.state.environments,
+        app.state.environment_versions,
+        app.state.parameter_presets,
+        repos.grants,
         services.policy,
     )
 

@@ -1,0 +1,206 @@
+"""B3 代码、模板、环境和参数预设 API。"""
+
+import base64
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Request
+
+from hydrolab.api.code_asset_schemas import (
+    CodeRepositoryView,
+    CodeVersionView,
+    CodeZipImport,
+    EnvironmentVersionCreate,
+    EnvironmentVersionView,
+    EnvironmentView,
+    GitImport,
+    NamedAssetCreate,
+    PresetCreate,
+    PresetView,
+    TemplateCreate,
+    TemplateVersionCreate,
+    TemplateVersionView,
+    TemplateView,
+)
+from hydrolab.auth.dependencies import get_current_user
+from hydrolab.code_assets.entities import (
+    CodeRepository,
+    CodeVersion,
+    EnvironmentVersion,
+    ExperimentTemplate,
+    ParameterPreset,
+    RuntimeEnvironment,
+    TemplateVersion,
+)
+from hydrolab.domain.entities import User
+
+router = APIRouter(tags=["code-assets"])
+
+
+def _repo_view(item: CodeRepository) -> CodeRepositoryView:
+    return CodeRepositoryView(id=item.id, name=item.name, description=item.description)
+
+
+def _code_version_view(item: CodeVersion) -> CodeVersionView:
+    return CodeVersionView(
+        id=item.id,
+        version_no=item.version_no,
+        source_type=item.source_type,
+        status=item.status,
+        content_hash=item.content_hash,
+        manifest=item.manifest,
+    )
+
+
+def _template_view(item: ExperimentTemplate) -> TemplateView:
+    return TemplateView(
+        id=item.id, code_repository_id=item.code_repository_id, name=item.name, description=item.description
+    )
+
+
+def _template_version_view(item: TemplateVersion) -> TemplateVersionView:
+    return TemplateVersionView(
+        id=item.id,
+        version_no=item.version_no,
+        code_version_id=item.code_version_id,
+        mode=item.mode,
+        argv=item.argv,
+        parameters=item.parameters,
+    )
+
+
+def _environment_view(item: RuntimeEnvironment) -> EnvironmentView:
+    return EnvironmentView(id=item.id, name=item.name, description=item.description)
+
+
+def _environment_version_view(item: EnvironmentVersion) -> EnvironmentVersionView:
+    return EnvironmentVersionView(
+        id=item.id,
+        version_no=item.version_no,
+        status=item.status,
+        base_image=item.base_image,
+        python_version=item.python_version,
+        content_hash=item.content_hash,
+    )
+
+
+def _preset_view(item: ParameterPreset) -> PresetView:
+    return PresetView(id=item.id, template_version_id=item.template_version_id, name=item.name, values=item.values)
+
+
+@router.get("/code-repositories", response_model=list[CodeRepositoryView])
+async def list_repositories(request: Request, user: User = Depends(get_current_user)) -> list[CodeRepositoryView]:
+    return [_repo_view(x) for x in await request.app.state.code_repositories.list_by_owner(user.id)]
+
+
+@router.post("/code-repositories", response_model=CodeRepositoryView, status_code=201)
+async def create_repository(
+    body: NamedAssetCreate, request: Request, user: User = Depends(get_current_user)
+) -> CodeRepositoryView:
+    return _repo_view(await request.app.state.code_import_service.create_repository(user, body.name, body.description))
+
+
+@router.post("/code-repositories/{repository_id}/zip-imports", response_model=CodeVersionView, status_code=201)
+async def import_zip(
+    repository_id: UUID, body: CodeZipImport, request: Request, user: User = Depends(get_current_user)
+) -> CodeVersionView:
+    try:
+        archive = base64.b64decode(body.content_base64, validate=True)
+    except ValueError as exc:
+        from hydrolab.core.errors import validation_error
+
+        raise validation_error("content_base64 不是有效 Base64") from exc
+    return _code_version_view(
+        await request.app.state.code_import_service.import_zip(user, repository_id, body.filename, archive)
+    )
+
+
+@router.post("/code-repositories/{repository_id}/git-imports", response_model=CodeVersionView, status_code=201)
+async def register_git(
+    repository_id: UUID, body: GitImport, request: Request, user: User = Depends(get_current_user)
+) -> CodeVersionView:
+    return _code_version_view(
+        await request.app.state.code_import_service.register_git(user, repository_id, body.source_ref, body.commit_sha)
+    )
+
+
+@router.get("/code-repositories/{repository_id}/versions", response_model=list[CodeVersionView])
+async def list_code_versions(
+    repository_id: UUID, request: Request, user: User = Depends(get_current_user)
+) -> list[CodeVersionView]:
+    await request.app.state.code_import_service.get_repository(user, repository_id)
+    return [_code_version_view(x) for x in await request.app.state.code_versions.list_by_repository(repository_id)]
+
+
+@router.get("/templates", response_model=list[TemplateView])
+async def list_templates(request: Request, user: User = Depends(get_current_user)) -> list[TemplateView]:
+    return [_template_view(x) for x in await request.app.state.templates.list_by_owner(user.id)]
+
+
+@router.post("/templates", response_model=TemplateView, status_code=201)
+async def create_template(
+    body: TemplateCreate, request: Request, user: User = Depends(get_current_user)
+) -> TemplateView:
+    return _template_view(
+        await request.app.state.template_environment_service.create_template(
+            user, body.code_repository_id, body.name, body.description
+        )
+    )
+
+
+@router.post("/templates/{template_id}/versions", response_model=TemplateVersionView, status_code=201)
+async def create_template_version(
+    template_id: UUID, body: TemplateVersionCreate, request: Request, user: User = Depends(get_current_user)
+) -> TemplateVersionView:
+    return _template_version_view(
+        await request.app.state.template_environment_service.create_template_version(
+            user,
+            template_id,
+            body.code_version_id,
+            body.mode,
+            body.argv,
+            body.parameters,
+            body.input_contract,
+            body.output_contract,
+        )
+    )
+
+
+@router.get("/templates/{template_id}/versions", response_model=list[TemplateVersionView])
+async def list_template_versions(
+    template_id: UUID, request: Request, user: User = Depends(get_current_user)
+) -> list[TemplateVersionView]:
+    return [_template_version_view(x) for x in await request.app.state.template_versions.list_by_template(template_id)]
+
+
+@router.get("/environments", response_model=list[EnvironmentView])
+async def list_environments(request: Request, user: User = Depends(get_current_user)) -> list[EnvironmentView]:
+    return [_environment_view(x) for x in await request.app.state.environments.list_by_owner(user.id)]
+
+
+@router.post("/environments", response_model=EnvironmentView, status_code=201)
+async def create_environment(
+    body: NamedAssetCreate, request: Request, user: User = Depends(get_current_user)
+) -> EnvironmentView:
+    return _environment_view(
+        await request.app.state.template_environment_service.create_environment(user, body.name, body.description)
+    )
+
+
+@router.post("/environments/{environment_id}/versions", response_model=EnvironmentVersionView, status_code=201)
+async def create_environment_version(
+    environment_id: UUID, body: EnvironmentVersionCreate, request: Request, user: User = Depends(get_current_user)
+) -> EnvironmentVersionView:
+    return _environment_version_view(
+        await request.app.state.template_environment_service.create_environment_version(
+            user, environment_id, body.base_image, body.python_version, body.dependency_file, body.dependency_content
+        )
+    )
+
+
+@router.post("/parameter-presets", response_model=PresetView, status_code=201)
+async def create_preset(body: PresetCreate, request: Request, user: User = Depends(get_current_user)) -> PresetView:
+    return _preset_view(
+        await request.app.state.template_environment_service.create_preset(
+            user, body.template_version_id, body.name, body.values
+        )
+    )

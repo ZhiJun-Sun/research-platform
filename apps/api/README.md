@@ -97,6 +97,26 @@ POST      /api/v1/dataset-imports/{job_id}/confirm-mapping|cancel|retry
 
 `READY` 版本的 manifest、内容哈希、映射和版本号不会被修改；修正映射必须以新的导入任务形成新版本。当前 `fake-upload` 是开发联调专用端点，生产 S3 预签名 multipart 上传、SSRF 安全 URL 下载、Parquet/NetCDF 内容探测与持久化仓储仍受 S3-01/真实环境门禁约束。
 
+## B3 已实现：代码、模板与运行环境资产
+
+B3 将训练所需的代码、入口约定、参数 Schema 和依赖环境纳入独立的不可变版本。当前 ZIP 导入只进行安全检查、清单识别和对象快照，**不会执行归档内的代码**：
+
+```text
+POST /api/v1/code-repositories
+POST /api/v1/code-repositories/{id}/zip-imports
+POST /api/v1/code-repositories/{id}/git-imports
+GET  /api/v1/code-repositories/{id}/versions
+
+POST /api/v1/templates
+POST /api/v1/templates/{id}/versions
+GET  /api/v1/templates/{id}/versions
+POST /api/v1/environments
+POST /api/v1/environments/{id}/versions
+POST /api/v1/parameter-presets
+```
+
+安全与可复现约束：ZIP 拒绝路径穿越、符号链接、文件/解压大小超限与压缩炸弹；Git 只登记无凭证 HTTPS 引用并保持 `PENDING`，未来由隔离 Worker clone；模板仅保存 argv 参数数组，拒绝 Shell 控制符；运行环境要求不可变镜像 digest；ParameterPreset 必须符合 TemplateVersion 的参数 Schema。
+
 ## 切换到真实服务
 
 按 `plans/05` 的 Spike 门禁逐个启用（见 `infra/README.md` 与 `.env.example`）。
