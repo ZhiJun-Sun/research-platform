@@ -1,7 +1,7 @@
 # HydroLab 后端实施路线与验收计划
 
 > 状态：Confirmed  
-> 当前阶段：B0 骨架、B1 身份/邀请/授权/分享、B2 文件夹/导入/不可变版本、B3 代码/模板/环境资产、B4 实验草稿/版本/Run 元数据、B5/B6 Fake Runner/观测基线已完成（2026-08-30，InMemory Repository 基线，81 项测试通过）；B7 待启动
+> 当前阶段：B0–B7 已完成（B5/B6 为 Fake-first 执行/观测基线，B7 为 Checkpoint 元数据/兼容性基线；2026-08-30，83 项测试通过）；B8 待启动
 > 目标：按定版交互原型建立可部署、可迁移、可测试的真实后端。
 
 ## 1. 实施前检查清单
@@ -198,6 +198,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 - 资源采样具有保留期，不无限增长。
 
 ### B7：Checkpoint、失败重试与兼容性
+
+> 状态：Checkpoint 不可变元数据与兼容性/repair_plan 基线已完成（83 项测试通过；真实权重、Scaler、Optimizer/Scheduler artifact 解析与持久化存储待真实 Runner/对象存储接入）
 
 **实现**
 

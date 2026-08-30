@@ -16,6 +16,8 @@ from hydrolab.api.container import build_repositories, build_services
 from hydrolab.api.deps import get_object_storage
 from hydrolab.api.routes import api_v1_router
 from hydrolab.api.routes.health import router as health_router
+from hydrolab.checkpoints.memory import InMemoryCheckpoints
+from hydrolab.checkpoints.service import CheckpointService
 from hydrolab.code_assets.imports import CodeImportService
 from hydrolab.code_assets.memory import (
     InMemoryCodeRepositories,
@@ -145,6 +147,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.environment_versions,
         repos.grants,
         services.policy,
+    )
+
+    app.state.checkpoints = InMemoryCheckpoints()
+    app.state.checkpoint_service = CheckpointService(
+        app.state.checkpoints, app.state.runs, app.state.experiment_versions
     )
 
     # B5/B6：Fake 控制与观测面。真实 Celery/Docker/Redis/MLflow 后续替换 Adapter。

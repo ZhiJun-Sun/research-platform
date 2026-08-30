@@ -154,6 +154,18 @@ GET  /api/v1/runs/{id}/resources
 
 GPU lease 在 Run 成功、失败或取消时释放；资源不足时拒绝启动，避免重复占用。事件流使用已有 `run-event-v1` 协议，SSE 支持 `Last-Event-ID` 游标恢复。当前内存实现仅用于无基础设施联调；B5/B6 的真实接入仍需要 Celery/Redis、Docker/NVIDIA、MLflow 和持久化事件存储。
 
+## B7 已实现：Checkpoint 元数据、兼容性校验与修复计划
+
+成功 Run 可以创建不可变 Checkpoint 元数据，并将来源 `ExperimentVersion.resolved_config` 固定为追溯依据：
+
+```text
+POST /api/v1/checkpoints
+GET  /api/v1/checkpoints
+POST /api/v1/checkpoints/{id}/compatibility
+```
+
+兼容性校验支持 `RESUME`、`FINETUNE`、`EVALUATE`、`PREDICT` 模式。`RESUME` 强制要求数据、代码、模板、环境来源版本完全一致且 Checkpoint 含 Optimizer；特征、模型签名或 Scaler 不匹配将得到结构化 `repair_plan`，例如 `FEATURE_MAPPING`、`MODEL_KEY_MAPPING`、`REFIT_SCALER`。当前仅管理元数据和规则，不加载或执行不可信权重文件；真实权重/Scaler artifact 解析将在真实对象存储与 Runner 接入后替换实现。
+
 ## 切换到真实服务
 
 按 `plans/05` 的 Spike 门禁逐个启用（见 `infra/README.md` 与 `.env.example`）。
