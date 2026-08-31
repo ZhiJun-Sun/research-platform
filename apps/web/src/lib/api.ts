@@ -13,6 +13,11 @@ export type ApiCheckpoint = { id: string; source_config: Record<string, unknown>
 export type ApiComparison = { metrics: Record<string, Record<string, number>>; baseline_result_id: string; dataset_version_id: string }
 export type ApiOperation = { id: string }
 
+export type ApiDatasetImport = { id: string; dataset_id: string; status: string; source_type: string; detected_format: string; progress: number; error_code: string | null }
+export type ApiMappingItem = { source_name: string; standard_name: string | null; semantic: string; unit: string | null; order: number; confidence: number; user_modified: boolean }
+export type ApiFieldMapping = { id: string; import_job_id: string; items: ApiMappingItem[]; created_at: string; confirmed_at: string | null }
+export type ApiDatasetVersion = { id: string; version_no: number; status: string; content_hash: string | null; manifest: Record<string, unknown> }
+
 type LoginResponse = { tokens: { access_token: string }; user: { display_name: string } }
 type Workspace = { user_name: string; runs: ApiRun[]; gpu_count: number; queued_count: number }
 const TOKEN_KEY = 'hydrolab-api-token'
@@ -76,6 +81,10 @@ export async function getRealSection(section: 'datasets' | 'code' | 'experiments
 export const advanceRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/advance`, { method: 'POST' })
 export const cancelRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/cancel`, { method: 'POST' })
 export const createDataset = (name: string, description: string) => authed<ApiCatalogItem>('/datasets', { method: 'POST', body: JSON.stringify({ name, description }) })
+export const createDatasetImport = (datasetId: string) => authed<ApiDatasetImport>('/dataset-imports', { method: 'POST', body: JSON.stringify({ dataset_id: datasetId, source_type: 'UPLOAD' }), headers: { 'Idempotency-Key': crypto.randomUUID() } })
+export const fakeUploadDataset = (jobId: string, filename: string, content: string) => authed<ApiDatasetImport>(`/dataset-imports/${jobId}/fake-upload`, { method: 'POST', body: JSON.stringify({ filename, content }) })
+export const getDatasetMapping = (jobId: string) => authed<ApiFieldMapping>(`/dataset-imports/${jobId}/mapping`)
+export const confirmDatasetMapping = (jobId: string, items: ApiMappingItem[]) => authed<ApiDatasetVersion>(`/dataset-imports/${jobId}/confirm-mapping`, { method: 'POST', body: JSON.stringify({ items }) })
 export const createDraft = (name: string, description: string) => authed<ApiDraft>('/experiment-drafts', { method: 'POST', body: JSON.stringify({ name, description }) })
 export const listDrafts = () => authed<ApiDraft[]>('/experiment-drafts')
 export const updateDraft = (draftId: string, patch: Partial<Pick<ApiDraft, 'dataset_version_id' | 'code_version_id' | 'template_version_id' | 'environment_version_id' | 'parameter_values'>>) => authed<ApiDraft>(`/experiment-drafts/${draftId}`, { method: 'PATCH', body: JSON.stringify(patch) })

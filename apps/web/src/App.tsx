@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, createDataset, createDraft, createExport, createPlot, ensureDevSession, getRealSection, getWorkspace, listCheckpoints, listDrafts, listMetrics, listResults, seedDemo, submitDraft, updateDraft } from './lib/api'
+import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createDataset, createDatasetImport, createDraft, createExport, createPlot, ensureDevSession, fakeUploadDataset, getDatasetMapping, getRealSection, getWorkspace, listCheckpoints, listDrafts, listMetrics, listResults, seedDemo, submitDraft, updateDraft } from './lib/api'
 import type { ApiCatalogItem, ApiRun } from './lib/api'
 import {
   Activity,
@@ -375,6 +375,48 @@ function ExperimentWizard({ close }: { close: () => void }) {
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="创建实验"><div className="wizard-modal"><header><div><span className="mono-label">NEW EXPERIMENT</span><h2>创建训练实验</h2><p>向导与高级模式共享同一份实验草稿。</p></div><div className="mode-switch"><button className={createMode === 'wizard' ? 'active' : ''} onClick={() => setCreateMode('wizard')}>分步向导</button><button className={createMode === 'advanced' ? 'active' : ''} onClick={() => setCreateMode('advanced')}>高级配置</button><button className="icon-button" onClick={close} aria-label="关闭"><X size={18} /></button></div></header>{createMode === 'advanced' ? <div className="advanced-body"><div className="advanced-intro"><span className="step-counter">ADVANCED CONFIG</span><h3>完整实验配置</h3><p>按区域展开并一次完成全部配置。字段与分步向导保持同步。</p></div><AdvancedExperimentForm /></div> : <div className="wizard-body"><aside>{steps.map((label, i) => <button className={step === i + 1 ? 'active' : step > i + 1 ? 'done' : ''} onClick={() => setStep(i + 1)} key={label}><span>{step > i + 1 ? <Check size={13} /> : i + 1}</span><div><b>{label}</b><small>{['模型与代码版本','目标数据版本','初始化与 Checkpoint','超参数与资源','检查后进入队列'][i]}</small></div></button>)}</aside><main><span className="step-counter">STEP {step} / 5</span><h3>{steps[step - 1]}</h3>{step === 1 && <div className="selection-list"><button className="selected"><FileCode2 /><div><b>KG-MoE-MS</b><span>commit 8fc2a1 · PyTorch 2.4 · CUDA 12.4</span></div><Check /></button><button><FileCode2 /><div><b>GRU Baseline</b><span>commit e921d0 · PyTorch 2.4 · CUDA 12.4</span></div></button><button><FileCode2 /><div><b>NeuralHydrology</b><span>v1.12.0 · 标准适配器</span></div></button></div>}{step === 2 && <div className="form-stack"><label>目标数据版本<select><option>北江目标流域 · v3</option><option>CAMELS-US · v2</option></select></label><div className="data-preview"><Database /><div><b>北江目标流域 v3</b><span>33 个流域 · 2012—2022 · 1 hour</span></div><StatusBadge status="已完成" /></div></div>}{step === 3 && <div className="mode-grid">{[['scratch','从头训练'],['resume','断点续训'],['finetune','跨数据集微调'],['evaluate','仅评估']].map(([id,label],i) => <button className={i === 2 ? 'selected' : ''} key={id}><b>{label}</b><span>{id}</span>{i === 2 && <Check />}</button>)}</div>}{step === 4 && <div><ParameterEditor/><div className="parameter-grid runtime-fields"><label>GPU 资源<select><option>自动分配单张 GPU</option></select></label><label>优先级<select><option>普通</option></select></label></div></div>}{step === 5 && <div className="review-list"><div><span>模型代码</span><b>KG-MoE-MS · 8fc2a1</b></div><div><span>数据版本</span><b>北江目标流域 · v3</b></div><div><span>训练方式</span><b>跨数据集微调</b></div><div><span>初始权重</span><b>CAMELS Best · epoch 42</b></div><div><span>资源估算</span><b>单 GPU · 约 3 小时</b></div></div>}</main></div>}<footer><button className="button secondary" onClick={createMode === 'wizard' && step > 1 ? () => setStep(step - 1) : close}>{createMode === 'wizard' && step > 1 ? '返回上一步' : '暂不创建'}</button><button className="button primary" onClick={createMode === 'wizard' && step < 5 ? () => setStep(step + 1) : close}>{createMode === 'wizard' && step < 5 ? '继续下一步' : '创建并进入队列'}<ChevronRight size={15} /></button></footer></div></div>
 }
 
+function DatasetImportPanel({ reload }: { reload: () => Promise<void> }) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const choose = (files: FileList | null) => setFile(files?.[0] ?? null)
+  const submit = async () => {
+    if (!name.trim()) { setError('请填写数据集名称'); return }
+    if (!file) { setError('请拖入或选择一个 CSV 文件'); return }
+    if (file.size > 2_000_000) { setError('当前本地 Fake/InMemory 联调仅支持不超过 2 MB 的文件；大文件需配置对象存储直传。'); return }
+    setSubmitting(true); setError(null); setMessage(null)
+    try {
+      await ensureDevSession()
+      const dataset = await createDataset(name.trim(), description.trim())
+      const job = await createDatasetImport(dataset.id)
+      const content = await file.text()
+      await fakeUploadDataset(job.id, file.name, content)
+      const mapping = await getDatasetMapping(job.id)
+      const version = await confirmDatasetMapping(job.id, mapping.items)
+      setMessage(`已创建数据集「${name.trim()}」并生成不可变版本 v${version.version_no} · ${version.id.slice(0, 8)}`)
+      setName(''); setDescription(''); setFile(null)
+      await reload()
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '导入请求失败')
+    } finally { setSubmitting(false) }
+  }
+  return <section className="dataset-import-panel">
+    <div className="dataset-import-heading"><div><p className="eyebrow">NEW DATASET</p><h2>新建并导入数据</h2><p>创建数据集后，系统会解析字段映射并生成一个不可变数据版本。</p></div><span className="status-badge neutral">本地联调</span></div>
+    <div className="dataset-import-fields"><label>数据集名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：北江 2023 年小时尺度观测" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：雨量、流量与气象站观测" /></label></div>
+    <input id="dataset-file-picker" className="visually-hidden" type="file" accept=".csv,text/csv" onChange={event => choose(event.target.files)} />
+    <label htmlFor="dataset-file-picker" className={`dataset-drop-zone ${dragging ? 'dragging' : ''}`} onDragOver={event => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); choose(event.dataTransfer.files) }}>
+      <FileUp size={26}/><div><b>{file ? file.name : '拖入 CSV 文件，或点击选择本地文件'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 将作为新版本的原始文件导入` : '当前本地联调支持 CSV，单文件不超过 2 MB'}</span></div>{file && <button type="button" className="button ghost" onClick={event => { event.preventDefault(); setFile(null) }}>移除</button>}
+    </label>
+    <div className="dataset-import-footer"><p>流程：创建数据集 → 上传原始文件 → 自动字段映射 → 确认不可变版本</p><button className="button primary" onClick={() => void submit()} disabled={submitting}><Database size={15}/>{submitting ? '正在导入并生成版本…' : '创建并导入数据集'}</button></div>
+    {message && <p className="onboarding"><b>{message}</b></p>}
+    {error && <p className="error-notice">数据导入错误：{error}</p>}
+  </section>
+}
+
 function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' | 'environments' }) {
   const [items, setItems] = useState<ApiCatalogItem[]>([])
   const [draftName, setDraftName] = useState('')
@@ -471,9 +513,10 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     {error && <p className="error-notice">API 联调错误：{error}</p>}
     {commandMessage && <p className="onboarding"><b>{commandMessage}</b></p>}
     {operationMessage && <p className="onboarding"><b>{operationMessage}</b></p>}
+    {section === 'datasets' && <DatasetImportPanel reload={load} />}
     {section === 'checkpoints' && <section className="section-block"><div className="section-heading"><div><h2>复用兼容性校验</h2><p>使用当前 Checkpoint 的冻结来源配置执行 Resume 校验。</p></div><button className="button primary" onClick={() => void runOperation('checkpoint')} disabled={submitting}>{submitting ? '正在校验…' : '校验 Resume 兼容性'}</button></div></section>}
     {section === 'results' && <section className="section-block"><div className="section-heading"><div><h2>结果操作</h2><p>以下操作调用正式指标、绘图规格、导出清单与结果对比 API。</p></div><div className="page-actions"><button className="button secondary" onClick={() => void runOperation('metrics')} disabled={submitting}>读取指标</button><button className="button secondary" onClick={() => void runOperation('plot')} disabled={submitting}>创建绘图</button><button className="button secondary" onClick={() => void runOperation('export')} disabled={submitting}>创建导出</button><button className="button primary" onClick={() => void runOperation('compare')} disabled={submitting}>比较结果</button></div></div></section>}
-    {(section === 'datasets' || section === 'experiments') && <section className="section-block"><div className="form-stack"><label>{section === 'datasets' ? '新数据集名称' : '新实验名称'}<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder={section === 'datasets' ? '例如：北江新增观测 v4' : '例如：Top-30 参数试验'} /></label><button className="button primary" onClick={() => void create()} disabled={submitting}><Plus size={15}/>{submitting ? '正在提交…' : section === 'datasets' ? '创建数据集' : '创建并提交实验'}</button></div>{section === 'experiments' && <p className="form-hint">创建会自动复用已验证的版本化数据、代码、模板与环境配置，随后通过 PATCH 草稿和 submit API 进入队列。</p>}</section>}
+    {section === 'experiments' && <section className="section-block"><div className="form-stack"><label>新实验名称<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：Top-30 参数试验" /></label><button className="button primary" onClick={() => void create()} disabled={submitting}><Plus size={15}/>{submitting ? '正在提交…' : '创建并提交实验'}</button></div><p className="form-hint">创建会自动复用已验证的版本化数据、代码、模板与环境配置，随后通过 PATCH 草稿和 submit API 进入队列。</p></section>}
     <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
     <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
     </section>
