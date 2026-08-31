@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getDatasetMapping, getRealSection, getWorkspace, importCodeGit, importCodeZip, listCheckpoints, listCodeRepositories, listCodeVersions, listDrafts, listMetrics, listResults, listTemplateVersions, listTemplates, seedDemo, submitDraft, updateDraft } from './lib/api'
-import type { ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiMappingItem, ApiRun } from './lib/api'
+import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getRealSection, getStoredUser, getWorkspace, importCodeGit, importCodeZip, listCheckpoints, listCodeRepositories, listCodeVersions, listDrafts, listMetrics, listResults, listTemplateVersions, listTemplates, login, logout, seedDemo, submitDraft, updateDraft } from './lib/api'
+import type { ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiMappingItem, ApiRun, ApiUser } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -191,6 +191,7 @@ function CheckpointReuse({ close }: { close: () => void }) {
 }
 
 function AssetAdminPage({ type }: { type:'permissions'|'environments' }) {
+  const selectedTemplateOption = templateOptions.find(option => option.id === selectedTemplateVersionId)
   return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">{type==='permissions'?'ACCESS CONTROL':'RUNTIME ASSETS'}</p><h1>{type==='permissions'?'权限与分享':'运行环境'}</h1><p>{type==='permissions'?'集中管理所有资源的只读分享链接。':'管理可供代码和实验选择的版本化运行环境。'}</p></div><button className="button primary"><Plus size={15}/>{type==='permissions'?'创建分享':'创建环境'}</button></header><section className="section-block"><div className="asset-list">{(type==='permissions'?[['北江目标流域 v3','有效至 09-05','尚未访问'],['Top-30 Best','永久有效','已访问 4 次']]:[['env-v3 · PyTorch 2.4','CUDA 12.4','构建成功'],['env-v2 · PyTorch 2.2','CUDA 12.1','构建成功']]).map(row=><div key={row[0]}><HardDrive size={16}/><span><b>{row[0]}</b><small>{row[1]}</small></span><code>{row[2]}</code><button className="button ghost">管理</button></div>)}</div></section></div>
 }
 
@@ -602,14 +603,34 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     {section === 'datasets' && <DatasetImportPanel reload={load} />}
     {section === 'checkpoints' && <section className="section-block"><div className="section-heading"><div><h2>复用兼容性校验</h2><p>使用当前 Checkpoint 的冻结来源配置执行 Resume 校验。</p></div><button className="button primary" onClick={() => void runOperation('checkpoint')} disabled={submitting}>{submitting ? '正在校验…' : '校验 Resume 兼容性'}</button></div></section>}
     {section === 'results' && <section className="section-block"><div className="section-heading"><div><h2>结果操作</h2><p>以下操作调用正式指标、绘图规格、导出清单与结果对比 API。</p></div><div className="page-actions"><button className="button secondary" onClick={() => void runOperation('metrics')} disabled={submitting}>读取指标</button><button className="button secondary" onClick={() => void runOperation('plot')} disabled={submitting}>创建绘图</button><button className="button secondary" onClick={() => void runOperation('export')} disabled={submitting}>创建导出</button><button className="button primary" onClick={() => void runOperation('compare')} disabled={submitting}>比较结果</button></div></div></section>}
-    {section === 'experiments' && <section className="section-block"><div className="form-stack"><label>新实验名称<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：Top-30 参数试验" /></label><label>可执行代码模板<select value={selectedTemplateVersionId} onChange={event => setSelectedTemplateVersionId(event.target.value)}><option value="">请选择一个代码模板版本</option>{templateOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label><button className="button primary" onClick={() => void create()} disabled={submitting || !templateOptions.length}><Plus size={15}/>{submitting ? '正在提交…' : '创建并提交实验'}</button></div><p className="form-hint">选择的模板固定关联一个不可变代码版本与 argv 训练入口；Runner 会将该版本物化到 <code>/workspace/code</code> 后执行。数据与运行环境暂复用已验证的版本化配置。</p>{!templateOptions.length && <p className="error-notice">尚无可执行模板。请先在“模型代码 / 模板”的代码版本详情中创建训练入口。</p>}</section>}
+    {section === 'experiments' && <section className="experiment-launch-card"><div className="experiment-launch-head"><div><p className="eyebrow">NEW RUN</p><h2>创建训练实验</h2><p>先确定可执行代码模板，再冻结数据和运行环境，随后创建一个独立的队列 Run。</p></div><span className="status-badge neutral">两步提交</span></div><div className="experiment-launch-grid"><div className="experiment-config"><div className="experiment-step"><span>01</span><div><b>实验标识</b><small>该名称将用于实验、Run 与结果追溯。</small></div></div><label>实验名称 <em>必填</em><input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：北江 Top-30 迁移训练" /></label><div className="experiment-step"><span>02</span><div><b>可执行代码与入口</b><small>模板固定关联一个不可变 CodeVersion 和 argv 训练入口。</small></div></div><label>训练模板版本 <em>必填</em><select value={selectedTemplateVersionId} onChange={event => setSelectedTemplateVersionId(event.target.value)}><option value="">请选择一个代码模板版本</option>{templateOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>{selectedTemplateOption && <div className="selected-template"><FileCode2 size={16}/><div><b>已选择可执行模板</b><span>{selectedTemplateOption.label}</span><code>CodeVersion {selectedTemplateOption.codeVersionId.slice(0, 8)}</code></div></div>}</div><aside className="experiment-freeze-summary"><p className="eyebrow">FROZEN INPUTS</p><h3>本次提交将冻结</h3><div><Database size={15}/><span><b>数据版本</b><small>当前复用已验证的 DatasetVersion</small></span><StatusBadge status="READY"/></div><div><FileCode2 size={15}/><span><b>代码与模板</b><small>{selectedTemplateOption ? `模板 ${selectedTemplateOption.id.slice(0, 8)} · 代码 ${selectedTemplateOption.codeVersionId.slice(0, 8)}` : '请选择代码模板版本'}</small></span><StatusBadge status={selectedTemplateOption ? 'READY' : 'PENDING'}/></div><div><HardDrive size={15}/><span><b>运行环境</b><small>当前复用已验证的 EnvironmentVersion</small></span><StatusBadge status="READY"/></div><p className="experiment-dispatch-note">本地模式会真实创建 Draft、冻结 ExperimentVersion 并进入队列；当前 Fake Runner 只模拟调度和事件，不执行真实 GPU 训练。</p></aside></div><footer className="experiment-launch-footer"><div><b>提交前检查</b><span>{templateOptions.length ? '已加载可选模板；提交后配置不可修改。' : '请先在“模型代码”页面创建可执行模板。'}</span></div><button className="button primary" onClick={() => void create()} disabled={submitting || !templateOptions.length || !selectedTemplateVersionId}><FlaskConical size={15}/>{submitting ? '正在冻结并提交…' : '冻结配置并创建 Run'}</button></footer>{!templateOptions.length && <p className="error-notice">尚无可执行模板。请先在“模型代码 / 模板”的代码版本详情中创建训练入口。</p>}</section>}
     <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
     <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
     </section>
   </div>
 }
 
+function LoginScreen({ onLoggedIn }: { onLoggedIn: (user: ApiUser) => void }) {
+  const [email, setEmail] = useState('admin@hydrolab.cn')
+  const [password, setPassword] = useState('admin123456')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const submit = async () => {
+    if (!email.trim() || !password) { setError('请输入邮箱和密码'); return }
+    setSubmitting(true); setError(null)
+    try { onLoggedIn(await login(email.trim(), password)) } catch (cause) { setError(cause instanceof ApiError ? cause.message : '登录失败') } finally { setSubmitting(false) }
+  }
+  return <main className="login-page"><section className="login-card"><div className="login-brand"><div className="brand-mark"><Activity size={20}/></div><div><b>HydroLab</b><span>EXPERIMENT OS</span></div></div><p className="eyebrow">SIGN IN</p><h1>登录实验平台</h1><p>使用你的账户访问已授权的数据、代码、实验与结果资产。</p><label>邮箱<input type="email" value={email} onChange={event => setEmail(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void submit() }} /></label><label>密码<input type="password" value={password} onChange={event => setPassword(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void submit() }} /></label>{error && <p className="error-notice">登录失败：{error}</p>}<button className="button primary" onClick={() => void submit()} disabled={submitting}>{submitting ? '正在登录…' : '登录 HydroLab'}<ChevronRight size={15}/></button><small>本地联调账号：<code>admin@hydrolab.cn</code> / <code>admin123456</code></small></section></main>
+}
+
+function AccountMenu({ user, close, onLogout }: { user: ApiUser; close: () => void; onLogout: () => void }) {
+  const initials = user.display_name.slice(0, 2).toUpperCase()
+  return <div className="account-menu"><div className="account-menu-user"><div className="avatar">{initials}</div><div><b>{user.display_name}</b><small>{user.email}</small></div></div><div className="account-menu-meta"><span>{user.is_admin ? '管理员' : '成员'}</span><span>{user.status}</span></div><button onClick={() => { close(); onLogout() }}>退出并切换账号</button></div>
+}
+
 export default function App() {
+  const [user, setUser] = useState<ApiUser | null>(() => getStoredUser())
+  const [accountOpen, setAccountOpen] = useState(false)
   const [view, setView] = useState<View>('dashboard')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [gpuOpen, setGpuOpen] = useState(false)
@@ -622,6 +643,9 @@ export default function App() {
   useEffect(() => { document.documentElement.classList.toggle('dark', resolvedDark) }, [resolvedDark])
   const cycleTheme = () => setTheme(t => t === 'system' ? 'light' : t === 'light' ? 'dark' : 'system')
   const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Settings
+  useEffect(() => { if (user) { void getCurrentUser().then(setUser).catch(() => setUser(null)) } }, [])
+  const handleLogout = async () => { await logout(); setAccountOpen(false); setUser(null); setView('dashboard') }
+  if (!user) return <LoginScreen onLoggedIn={setUser} />
   return (
     <div className="app-shell">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
@@ -644,7 +668,7 @@ export default function App() {
         </nav>
         <div className="sidebar-footer">
           <div className="server-health"><span /><div><b>服务运行正常</b><small>2 GPU · 3 队列任务</small></div></div>
-          <button><div className="avatar">SZ</div><div><b>sunzhijun03</b><small>管理员</small></div><ChevronRight size={14} /></button>
+          <div className="account-anchor"><button onClick={() => setAccountOpen(open => !open)} aria-expanded={accountOpen}><div className="avatar">{user.display_name.slice(0, 2).toUpperCase()}</div><div><b>{user.display_name}</b><small>{user.is_admin ? '管理员' : '成员'}</small></div><ChevronRight size={14} /></button>{accountOpen && <AccountMenu user={user} close={() => setAccountOpen(false)} onLogout={() => void handleLogout()} />}</div>
         </div>
       </aside>
       {menuOpen && <button className="mobile-overlay" aria-label="关闭导航" onClick={() => setMenuOpen(false)} />}

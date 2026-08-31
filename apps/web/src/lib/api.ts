@@ -22,9 +22,11 @@ export type ApiMappingItem = { source_name: string; standard_name: string | null
 export type ApiFieldMapping = { id: string; import_job_id: string; items: ApiMappingItem[]; created_at: string; confirmed_at: string | null }
 export type ApiDatasetVersion = { id: string; version_no: number; status: string; content_hash: string | null; manifest: Record<string, unknown> }
 
-type LoginResponse = { tokens: { access_token: string }; user: { display_name: string } }
+export type ApiUser = { id: string; email: string; display_name: string; is_admin: boolean; status: string }
+type LoginResponse = { tokens: { access_token: string; refresh_token: string }; user: ApiUser }
 type Workspace = { user_name: string; runs: ApiRun[]; gpu_count: number; queued_count: number }
 const TOKEN_KEY = 'hydrolab-api-token'
+const USER_KEY = 'hydrolab-api-user'
 const API_ROOT = '/api/v1'
 
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message) } }
@@ -36,16 +38,31 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.status === 204 ? undefined as T : response.json() as Promise<T>
 }
 
+export const getStoredUser = (): ApiUser | null => {
+  const raw = sessionStorage.getItem(USER_KEY)
+  try { return raw ? JSON.parse(raw) as ApiUser : null } catch { return null }
+}
+export const login = async (email: string, password: string): Promise<ApiUser> => {
+  const result = await request<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+  sessionStorage.setItem(TOKEN_KEY, result.tokens.access_token)
+  sessionStorage.setItem(USER_KEY, JSON.stringify(result.user))
+  return result.user
+}
+export const getCurrentUser = async () => {
+  const user = await request<ApiUser>('/me')
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user))
+  return user
+}
+export const logout = async () => {
+  try { await request<void>('/auth/logout', { method: 'POST' }) } finally { sessionStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(USER_KEY) }
+}
 export async function ensureDevSession(): Promise<string> {
   const token = sessionStorage.getItem(TOKEN_KEY)
-  if (token) return token
-  const result = await request<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'admin@hydrolab.cn', password: 'admin123456' }) })
-  sessionStorage.setItem(TOKEN_KEY, result.tokens.access_token)
-  return result.user.display_name
+  if (!token) throw new ApiError(401, '请先登录后再继续操作')
+  return getStoredUser()?.display_name ?? '当前用户'
 }
-
 async function withSessionRetry<T>(operation: () => Promise<T>): Promise<T> {
-  try { return await operation() } catch (error) { if (!(error instanceof ApiError) || error.status !== 401) throw error; sessionStorage.removeItem(TOKEN_KEY); await ensureDevSession(); return operation() }
+  try { return await operation() } catch (error) { if (error instanceof ApiError && error.status === 401) { sessionStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(USER_KEY) }; throw error }
 }
 const authed = <T>(path: string, init?: RequestInit) => withSessionRetry(() => request<T>(path, init))
 
