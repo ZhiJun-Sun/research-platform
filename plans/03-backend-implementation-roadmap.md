@@ -1,7 +1,7 @@
 # HydroLab 后端实施路线与验收计划
 
 > 状态：Confirmed  
-> 当前阶段：B0–B7 已完成（B5/B6 为 Fake-first 执行/观测基线，B7 为 Checkpoint 元数据/兼容性基线；2026-08-30，83 项测试通过）；B8 待启动
+> 状态：B0–B8 后端 Fake-first 基线已完成（B8 结果/绘图规格/导出清单/同数据版本 Run 对比，90 项源码检查通过、87 项测试通过）；运行中心已完成 FastAPI 本地联调和浏览器操作验证。B9 部署骨架已交付，真实 Adapter、Docker、Ubuntu 双 RTX 4090 验收待云端环境。
 > 目标：按定版交互原型建立可部署、可迁移、可测试的真实后端。
 
 ## 1. 实施前检查清单
@@ -219,6 +219,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### B8：结果、诊断、绘图、导出与对比
 
+> 状态：后端 Fake-first 基线已完成（Result/Metric/Artifact/PlotSpec/ExportManifest、同冻结数据版本比较、87 项测试通过）；前端结果页仍为原型数据，待逐页迁移至 Results API。
+
 **实现**
 
 - Result、Artifact、全局/逐流域指标、事件指标。
@@ -236,6 +238,8 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 - 不兼容 Run 无法进入对比；基线差异计算有测试。
 
 ### B9：生产加固与 Ubuntu 双 4090 部署
+
+> 状态：Docker Compose、镜像定义、环境模板、反向代理与云端验收 Runbook 已交付；本机无 Docker CLI，真实 S3/Celery/MLflow/Docker Adapter 与 Ubuntu 双 4090 验收尚未执行。
 
 **实现**
 

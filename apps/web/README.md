@@ -1,6 +1,6 @@
-# HydroLab 交互原型
+# HydroLab 前端与 FastAPI 联调
 
-面向水文与通用时序预测研究的实验管理平台原型。当前阶段使用明确标记的模拟数据验证信息架构和关键操作流程，随后再接入 FastAPI、PostgreSQL、Redis、MinIO、MLflow 与双 GPU Runner。
+面向水文与通用时序预测研究的实验管理平台。前端保留定版交互原型；运行中心已接入本地 FastAPI 的认证与受保护 Fake/InMemory 工作区 API，用于验证真实请求、加载、错误和 Run 状态操作。
 
 ## 技术栈
 
@@ -34,22 +34,38 @@ react-ts/
 └── README.md
 ```
 
-## 快速开始
+## 本地前后端联调
+
+终端一：启动 FastAPI（默认 InMemory/Fake Adapter，重启会重置开发数据）：
 
 ```bash
-# 1. 复制环境变量
-cp .env.example .env.local
-# 填写 VITE_APPWRITE_PROJECT_ID
+cd apps/api
+uv sync
+uv run uvicorn hydrolab.main:app --host 127.0.0.1 --port 8011
+```
 
-# 2. 安装依赖
+终端二：启动 Vite（`/api` 自动代理到 `8011`）：
+
+```bash
+cd apps/web
 npm install
+npm run dev -- --host 127.0.0.1 --port 5175
+```
 
-# 3. 启动开发服务器
-npm run dev
+访问 `http://127.0.0.1:5175/`。前端会以本地开发管理员 `admin@hydrolab.cn / admin123456` 登录，读取受保护的 Fake 工作区数据；若 API 重启导致 Token 失效，客户端会自动重新登录并重试一次请求。
 
-# 4. 构建
+```bash
+# 前端构建
 npm run build
 ```
+
+生产部署编排及 Ubuntu GPU 验收见 `../../infra/README.md`。
+
+## 当前接入范围
+
+- **运行中心**：已接入 FastAPI `/auth/login` 和仅 local/test 启用的受保护 Demo 工作区 API；真实展示 Fake Runner 的任务列表，并支持推进/取消状态操作。浏览器已验证任务加载、推进与 Token 重启恢复。
+- **其他页面**：数据、代码、实验、Checkpoint、结果与对比仍保留交互原型数据。后端已具备相应 B1–B8 API，但尚待按页面替换为真实 API Client。
+- **训练执行**：当前是 Fake/InMemory Runner，不会启动真实训练或占用服务器 GPU。
 
 ## 原型范围
 

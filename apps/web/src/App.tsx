@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { advanceRun, ApiError, cancelRun, ensureDevSession, getWorkspace } from './lib/api'
+import type { ApiRun } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -87,6 +89,32 @@ function StatusBadge({ status }: { status: string }) {
 
 function Dashboard({ openRun, openWizard, openGpu }: { openRun: () => void; openWizard: () => void; openGpu: () => void }) {
   const [onboardingOpen,setOnboardingOpen]=useState(true)
+  const [apiRuns, setApiRuns] = useState<ApiRun[]>([])
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+  const [loadingWorkspace, setLoadingWorkspace] = useState(true)
+  const loadWorkspace = async () => {
+    setLoadingWorkspace(true)
+    setWorkspaceError(null)
+    try {
+      await ensureDevSession()
+      const workspace = await getWorkspace()
+      setApiRuns(workspace.runs)
+    } catch (error) {
+      setWorkspaceError(error instanceof ApiError ? error.message : '无法连接本地 API')
+    } finally {
+      setLoadingWorkspace(false)
+    }
+  }
+  useEffect(() => { void loadWorkspace() }, [])
+  const statusLabel: Record<ApiRun['status'], string> = { QUEUED: '等待中', RUNNING: '运行中', SUCCEEDED: '已完成', CANCELLED: '已取消' }
+  const progressRun = async (runId: string, action: 'advance' | 'cancel') => {
+    try {
+      const updated = action === 'advance' ? await advanceRun(runId) : await cancelRun(runId)
+      setApiRuns(items => items.map(item => item.id === updated.id ? updated : item))
+    } catch (error) {
+      setWorkspaceError(error instanceof ApiError ? error.message : 'Run 操作失败')
+    }
+  }
   return (
     <div className="page-stack">
       <header className="page-heading">
@@ -101,18 +129,20 @@ function Dashboard({ openRun, openWizard, openGpu }: { openRun: () => void; open
       </section>
 
       <section className="section-block">
-        <div className="section-heading"><div><h2>当前训练任务</h2><p>任务进度由容器中的 JSONL 事件持续更新</p></div><button className="button ghost"><RefreshCw size={14} />刷新状态</button></div>
+        <div className="section-heading"><div><h2>当前训练任务</h2><p>来自本地 FastAPI Fake Runner 的受保护 API 数据</p></div><button className="button ghost" onClick={() => void loadWorkspace()} disabled={loadingWorkspace}><RefreshCw size={14} />{loadingWorkspace ? '加载中' : '刷新状态'}</button></div>
+        {workspaceError && <p className="error-notice">API 联调错误：{workspaceError}</p>}
         <div className="run-table-wrap">
           <table className="run-table">
             <thead><tr><th>任务</th><th>模型 / 数据</th><th>进度</th><th>NSE</th><th>GPU</th><th>状态</th><th /></tr></thead>
-            <tbody>{runs.map((run) => (
+            <tbody>{apiRuns.map((run) => (
               <tr key={run.id} onClick={openRun} className="clickable-row">
                 <td><span className="run-id">{run.id}</span><b>{run.name}</b></td>
                 <td><span>{run.model}</span><small>{run.dataset}</small></td>
-                <td><div className="table-progress"><span><i style={{ width: `${(run.epoch / run.total) * 100}%` }} /></span><small>Epoch {run.epoch}/{run.total} · {run.eta}</small></div></td>
-                <td className="metric">{run.nse.toFixed(3)}</td><td className="mono">{run.gpu}</td><td><StatusBadge status={run.status} /></td><td><ChevronRight size={16} /></td>
+                <td><div className="table-progress"><span><i style={{ width: `${(run.epoch / run.total_epochs) * 100}%` }} /></span><small>Epoch {run.epoch}/{run.total_epochs} · {run.eta ?? '—'}</small></div></td>
+                <td className="metric">{run.nse?.toFixed(3) ?? '—'}</td><td className="mono">{run.gpu}</td><td><StatusBadge status={statusLabel[run.status]} /></td>
+                <td onClick={event => event.stopPropagation()}>{run.status === 'RUNNING' && <button className="button ghost" onClick={() => void progressRun(run.id, 'advance')}>推进</button>}{(run.status === 'RUNNING' || run.status === 'QUEUED') && <button className="button ghost" onClick={() => void progressRun(run.id, 'cancel')}>取消</button>}</td>
               </tr>
-            ))}</tbody>
+            ))}{!loadingWorkspace && apiRuns.length === 0 && <tr><td colSpan={7}>暂无后端 Run</td></tr>}</tbody>
           </table>
         </div>
       </section>

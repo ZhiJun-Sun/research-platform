@@ -15,6 +15,7 @@ from hydrolab.adapters.fake.task_queue import FakeTaskQueue
 from hydrolab.api.container import build_repositories, build_services
 from hydrolab.api.deps import get_object_storage
 from hydrolab.api.routes import api_v1_router
+from hydrolab.api.routes.dev_demo import router as dev_demo_router
 from hydrolab.api.routes.health import router as health_router
 from hydrolab.checkpoints.memory import InMemoryCheckpoints
 from hydrolab.checkpoints.service import CheckpointService
@@ -61,6 +62,8 @@ from hydrolab.experiments.memory import (
     InMemoryRunStages,
 )
 from hydrolab.experiments.service import ExperimentService
+from hydrolab.results.memory import InMemoryArtifacts, InMemoryExports, InMemoryMetrics, InMemoryPlots, InMemoryResults
+from hydrolab.results.service import ResultService
 
 _DEV_BOOTSTRAP_EMAIL = "admin@hydrolab.cn"
 _DEV_BOOTSTRAP_PASSWORD = "admin123456"
@@ -149,6 +152,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         services.policy,
     )
 
+    app.state.results = InMemoryResults()
+    app.state.result_metrics = InMemoryMetrics()
+    app.state.result_artifacts = InMemoryArtifacts()
+    app.state.plot_specs = InMemoryPlots()
+    app.state.export_manifests = InMemoryExports()
+    app.state.result_service = ResultService(
+        app.state.results,
+        app.state.result_metrics,
+        app.state.result_artifacts,
+        app.state.plot_specs,
+        app.state.export_manifests,
+        app.state.runs,
+        app.state.experiment_versions,
+    )
+
     app.state.checkpoints = InMemoryCheckpoints()
     app.state.checkpoint_service = CheckpointService(
         app.state.checkpoints, app.state.runs, app.state.experiment_versions
@@ -227,6 +245,8 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health_router)
     app.include_router(api_v1_router)
+    if settings.environment != "production":
+        app.include_router(dev_demo_router, prefix="/api/v1")
     return app
 
 
