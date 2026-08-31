@@ -35,6 +35,9 @@ class CodeVersionView(BaseModel):
     version_no: int
     source_type: CodeSourceType
     status: CodeVersionStatus
+    object_key: str | None = None
+    source_ref: str | None = None
+    commit_sha: str | None = None
     content_hash: str | None
     manifest: dict[str, Any]
 

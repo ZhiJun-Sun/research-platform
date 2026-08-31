@@ -13,6 +13,10 @@ export type ApiCheckpoint = { id: string; source_config: Record<string, unknown>
 export type ApiComparison = { metrics: Record<string, Record<string, number>>; baseline_result_id: string; dataset_version_id: string }
 export type ApiOperation = { id: string }
 
+export type ApiTemplate = { id: string; code_repository_id: string; name: string; description: string }
+export type ApiTemplateVersion = { id: string; version_no: number; code_version_id: string; mode: string; argv: string[]; parameters: unknown[] }
+export type ApiCodeRepository = { id: string; name: string; description: string }
+export type ApiCodeVersion = { id: string; version_no: number; source_type: 'ZIP' | 'GIT'; status: string; object_key: string | null; source_ref: string | null; commit_sha: string | null; content_hash: string | null; manifest: { files?: string[]; file_count?: number; detected_manifests?: string[] } }
 export type ApiDatasetImport = { id: string; dataset_id: string; status: string; source_type: string; detected_format: string; progress: number; error_code: string | null }
 export type ApiMappingItem = { source_name: string; standard_name: string | null; semantic: string; unit: string | null; order: number; confidence: number; user_modified: boolean }
 export type ApiFieldMapping = { id: string; import_job_id: string; items: ApiMappingItem[]; created_at: string; confirmed_at: string | null }
@@ -80,6 +84,15 @@ export async function getRealSection(section: 'datasets' | 'code' | 'experiments
 }
 export const advanceRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/advance`, { method: 'POST' })
 export const cancelRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/cancel`, { method: 'POST' })
+export const listTemplates = () => authed<ApiTemplate[]>('/templates')
+export const createTemplate = (repositoryId: string, name: string, description: string) => authed<ApiTemplate>('/templates', { method: 'POST', body: JSON.stringify({ code_repository_id: repositoryId, name, description }) })
+export const listTemplateVersions = (templateId: string) => authed<ApiTemplateVersion[]>(`/templates/${templateId}/versions`)
+export const createTemplateVersion = (templateId: string, codeVersionId: string, argv: string[]) => authed<ApiTemplateVersion>(`/templates/${templateId}/versions`, { method: 'POST', body: JSON.stringify({ code_version_id: codeVersionId, mode: 'TRAIN', argv, parameters: [], input_contract: {}, output_contract: {} }) })
+export const createCodeRepository = (name: string, description: string) => authed<ApiCodeRepository>('/code-repositories', { method: 'POST', body: JSON.stringify({ name, description }) })
+export const listCodeRepositories = () => authed<ApiCodeRepository[]>('/code-repositories')
+export const listCodeVersions = (repositoryId: string) => authed<ApiCodeVersion[]>(`/code-repositories/${repositoryId}/versions`)
+export const importCodeZip = (repositoryId: string, filename: string, contentBase64: string) => authed<ApiCodeVersion>(`/code-repositories/${repositoryId}/zip-imports`, { method: 'POST', body: JSON.stringify({ filename, content_base64: contentBase64 }) })
+export const importCodeGit = (repositoryId: string, sourceRef: string, commitSha: string) => authed<ApiCodeVersion>(`/code-repositories/${repositoryId}/git-imports`, { method: 'POST', body: JSON.stringify({ source_ref: sourceRef, commit_sha: commitSha || null }) })
 export const createDataset = (name: string, description: string) => authed<ApiCatalogItem>('/datasets', { method: 'POST', body: JSON.stringify({ name, description }) })
 export const createDatasetImport = (datasetId: string) => authed<ApiDatasetImport>('/dataset-imports', { method: 'POST', body: JSON.stringify({ dataset_id: datasetId, source_type: 'UPLOAD' }), headers: { 'Idempotency-Key': crypto.randomUUID() } })
 export const fakeUploadDataset = (jobId: string, filename: string, content: string) => authed<ApiDatasetImport>(`/dataset-imports/${jobId}/fake-upload`, { method: 'POST', body: JSON.stringify({ filename, content }) })

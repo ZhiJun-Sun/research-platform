@@ -46,6 +46,9 @@ def _code_version_view(item: CodeVersion) -> CodeVersionView:
         version_no=item.version_no,
         source_type=item.source_type,
         status=item.status,
+        object_key=item.object_key,
+        source_ref=item.source_ref,
+        commit_sha=item.commit_sha,
         content_hash=item.content_hash,
         manifest=item.manifest,
     )

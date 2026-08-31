@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createDataset, createDatasetImport, createDraft, createExport, createPlot, ensureDevSession, fakeUploadDataset, getDatasetMapping, getRealSection, getWorkspace, listCheckpoints, listDrafts, listMetrics, listResults, seedDemo, submitDraft, updateDraft } from './lib/api'
-import type { ApiCatalogItem, ApiMappingItem, ApiRun } from './lib/api'
+import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getDatasetMapping, getRealSection, getWorkspace, importCodeGit, importCodeZip, listCheckpoints, listCodeRepositories, listCodeVersions, listDrafts, listMetrics, listResults, listTemplateVersions, listTemplates, seedDemo, submitDraft, updateDraft } from './lib/api'
+import type { ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiMappingItem, ApiRun } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -429,6 +429,69 @@ function DatasetImportPanel({ reload }: { reload: () => Promise<void> }) {
   </section>
 }
 
+function CodeRepositoryPanel() {
+  const [repositories, setRepositories] = useState<ApiCodeRepository[]>([])
+  const [versions, setVersions] = useState<Record<string, ApiCodeVersion[]>>({})
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [source, setSource] = useState<'zip' | 'git'>('zip')
+  const [file, setFile] = useState<File | null>(null)
+  const [gitUrl, setGitUrl] = useState('')
+  const [commit, setCommit] = useState('')
+  const [entrypoints, setEntrypoints] = useState<Record<string, string>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const load = async () => {
+    try {
+      await ensureDevSession(); await seedDemo()
+      const repos = await listCodeRepositories()
+      setRepositories(repos)
+      const loaded = await Promise.all(repos.map(async repo => [repo.id, await listCodeVersions(repo.id)] as const))
+      setVersions(Object.fromEntries(loaded))
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : '无法加载代码资产') }
+  }
+  useEffect(() => { void load() }, [])
+  const toBase64 = async (selected: File) => {
+    const bytes = new Uint8Array(await selected.arrayBuffer())
+    let binary = ''
+    bytes.forEach(byte => { binary += String.fromCharCode(byte) })
+    return btoa(binary)
+  }
+  const createExecutable = async (repository: ApiCodeRepository, version: ApiCodeVersion) => {
+    const entrypoint = (entrypoints[version.id] || 'python train.py').trim()
+    const argv = entrypoint.split(/\s+/).filter(Boolean)
+    if (!argv.length) { setError('请填写训练入口，例如：python train.py'); return }
+    setSubmitting(true); setError(null)
+    try {
+      await ensureDevSession()
+      const template = await createTemplate(repository.id, `${repository.name} · 训练`, '由代码资产页创建的受控训练入口')
+      const created = await createTemplateVersion(template.id, version.id, argv)
+      setMessage(`已创建可执行模板「${template.name}」v${created.version_no}。现在可在“实验”页选择它创建训练 Run。`)
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '创建执行模板失败') } finally { setSubmitting(false) }
+  }
+  const submit = async () => {
+    if (!name.trim()) { setError('请填写代码仓库名称'); return }
+    if (source === 'zip' && !file) { setError('请选择 ZIP 代码归档'); return }
+    if (source === 'git' && !gitUrl.trim()) { setError('请填写无凭证的 HTTPS Git 地址'); return }
+    if (file && file.size > 10_000_000) { setError('当前本地联调 ZIP 不超过 10 MB；生产环境应使用对象存储直传。'); return }
+    setSubmitting(true); setError(null); setMessage(null)
+    try {
+      await ensureDevSession()
+      const repo = await createCodeRepository(name.trim(), description.trim())
+      const version = source === 'zip'
+        ? await importCodeZip(repo.id, file!.name, await toBase64(file!))
+        : await importCodeGit(repo.id, gitUrl.trim(), commit.trim())
+      setMessage(source === 'zip'
+        ? `已导入代码「${repo.name}」v${version.version_no}，状态 ${version.status}；可在实验中选择该不可变版本。`
+        : `已登记 Git 代码「${repo.name}」v${version.version_no}，状态 ${version.status}；等待 Worker 拉取并冻结 Commit。`)
+      setName(''); setDescription(''); setFile(null); setGitUrl(''); setCommit('')
+      await load()
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '代码导入失败') } finally { setSubmitting(false) }
+  }
+  return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">MODEL CODE</p><h1>模型代码 / 模板</h1><p>每位用户仅看到自己拥有或被授权的代码仓库、不可变版本与可执行模板。</p></div><button className="button secondary" onClick={() => void load()}><RefreshCw size={15}/>刷新</button></header><section className="code-import-panel"><div className="dataset-import-heading"><div><p className="eyebrow">IMPORT CODE</p><h2>导入模型代码</h2><p>ZIP 会安全检查并冻结到对象存储；Git 仅登记 HTTPS 来源，等待 Worker 拉取固定 Commit。</p></div></div><div className="source-toggle"><button className={source === 'zip' ? 'active' : ''} onClick={() => setSource('zip')}>本地 ZIP</button><button className={source === 'git' ? 'active' : ''} onClick={() => setSource('git')}>Git HTTPS</button></div><div className="dataset-import-fields"><label>代码仓库名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：KG-MoE-MS 北江实验" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：2024 训练脚本与配置" /></label></div>{source === 'zip' ? <label className="dataset-drop-zone"><FileUp size={26}/><div><b>{file ? file.name : '选择包含训练入口的 ZIP 归档'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 将检查文件清单并创建不可变版本` : '不执行 ZIP 内代码；拒绝路径穿越、符号链接和压缩炸弹'}</span></div><input className="visually-hidden" type="file" accept=".zip,application/zip" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label> : <div className="dataset-import-fields"><label>Git HTTPS 地址 <em>必填</em><input value={gitUrl} onChange={event => setGitUrl(event.target.value)} placeholder="https://github.com/org/repository.git" /></label><label>固定 Commit <span>建议填写</span><input value={commit} onChange={event => setCommit(event.target.value)} placeholder="例如：a1b2c3d4" /></label></div>}<div className="dataset-import-footer"><p>导入后，实验 Runner 会把选中的不可变版本物化到受控工作目录，再按模板 argv 执行；不会直接执行任意宿主机路径。</p><button className="button primary" onClick={() => void submit()} disabled={submitting}><FileCode2 size={15}/>{submitting ? '正在导入…' : '导入代码版本'}</button></div>{message && <p className="onboarding"><b>{message}</b></p>}{error && <p className="error-notice">代码导入错误：{error}</p>}</section><section className="section-block"><div className="section-heading"><div><h2>我的代码仓库</h2><p>{repositories.length} 个可访问仓库 · 每个版本均可追溯来源、内容摘要与执行入口。</p></div></div><div className="code-repository-list">{repositories.map(repo => <article key={repo.id}><header><div><FileCode2 size={18}/><span><b>{repo.name}</b><small>{repo.description || '未填写说明'}</small></span></div><code>{repo.id.slice(0, 8)}</code></header>{(versions[repo.id] ?? []).map(version => <div className="code-version-row" key={version.id}><div><b>v{version.version_no} · {version.source_type}</b><small>{version.status === 'READY' ? `存储键：${version.object_key ?? '—'}` : `来源：${version.source_ref ?? '—'}${version.commit_sha ? ` @ ${version.commit_sha}` : ''}`}</small></div><div><code>{version.content_hash?.slice(0, 12) ?? '等待拉取'}</code><span>{version.manifest.file_count ?? 0} 个文件 · {(version.manifest.detected_manifests ?? []).join('、') || '未识别依赖清单'}</span></div><details><summary>查看文件与执行说明</summary><p>Runner 工作目录：<code>/workspace/code</code>（运行时受控物化，不是宿主机固定路径）</p><p>文件：{(version.manifest.files ?? []).slice(0, 12).join('、') || 'Git 拉取后生成'}</p>{version.status === 'READY' && <div className="template-entrypoint"><label>训练入口 argv<input value={entrypoints[version.id] ?? 'python train.py'} onChange={event => setEntrypoints(current => ({ ...current, [version.id]: event.target.value }))} placeholder="python train.py" /></label><button className="button secondary" onClick={() => void createExecutable(repo, version)} disabled={submitting}>创建可执行模板</button></div>}</details></div>)}{!(versions[repo.id] ?? []).length && <p className="quiet">尚未导入版本。</p>}</article>)}{!repositories.length && <p className="quiet">还没有代码仓库。请先导入 ZIP 或登记 Git HTTPS 地址。</p>}</div></section></div>
+}
+
 function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' | 'environments' }) {
   const [items, setItems] = useState<ApiCatalogItem[]>([])
   const [draftName, setDraftName] = useState('')
@@ -436,6 +499,8 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
   const [operationMessage, setOperationMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [templateOptions, setTemplateOptions] = useState<{ id: string; codeVersionId: string; label: string }[]>([])
+  const [selectedTemplateVersionId, setSelectedTemplateVersionId] = useState('')
   const [loading, setLoading] = useState(true)
   const config = {
     datasets: ['DATA', '数据', '不可变数据版本与字段映射'],
@@ -452,6 +517,13 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
       await seedDemo()
       const loadedItems = await getRealSection(section)
       setItems(loadedItems)
+      if (section === 'experiments') {
+        const templates = await listTemplates()
+        const loadedTemplates = await Promise.all(templates.map(async template => ({ template, versions: await listTemplateVersions(template.id) })))
+        const options = loadedTemplates.flatMap(({ template, versions }) => versions.map(version => ({ id: version.id, codeVersionId: version.code_version_id, label: `${template.name} · v${version.version_no} · ${version.argv.join(' ')}` })))
+        setTemplateOptions(options)
+        setSelectedTemplateVersionId(current => current || options[0]?.id || '')
+      }
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : '无法连接本地 API')
     } finally { setLoading(false) }
@@ -502,14 +574,16 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
         setCommandMessage(`后端已创建数据集「${draftName.trim()}」· ${created.id}`)
       } else {
         const draft = await createDraft(draftName.trim(), '通过前端真实 API 创建')
-        const configuredDraft = (await listDrafts()).find(item => item.status === 'SUBMITTED' && item.dataset_version_id && item.code_version_id && item.template_version_id && item.environment_version_id)
-        if (!configuredDraft) throw new Error('未找到可复用的完整联调配置')
+        const configuredDraft = (await listDrafts()).find(item => item.status === 'SUBMITTED' && item.dataset_version_id && item.environment_version_id)
+        const selectedTemplate = templateOptions.find(option => option.id === selectedTemplateVersionId)
+        if (!configuredDraft) throw new Error('未找到可复用的数据版本与运行环境配置')
+        if (!selectedTemplate) throw new Error('请选择一个可执行模板版本；请先在“模型代码 / 模板”中为代码版本创建模板。')
         await updateDraft(draft.id, {
           dataset_version_id: configuredDraft.dataset_version_id,
-          code_version_id: configuredDraft.code_version_id,
-          template_version_id: configuredDraft.template_version_id,
+          code_version_id: selectedTemplate.codeVersionId,
+          template_version_id: selectedTemplate.id,
           environment_version_id: configuredDraft.environment_version_id,
-          parameter_values: { ...configuredDraft.parameter_values, epochs: 50 },
+          parameter_values: {},
         })
         const submitted = await submitDraft(draft.id)
         setCommandMessage(`实验「${submitted.experiment.name}」已提交 · Run ${submitted.run.id.slice(0, 8)} 已进入 ${submitted.run.status} 队列`)
@@ -528,7 +602,7 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     {section === 'datasets' && <DatasetImportPanel reload={load} />}
     {section === 'checkpoints' && <section className="section-block"><div className="section-heading"><div><h2>复用兼容性校验</h2><p>使用当前 Checkpoint 的冻结来源配置执行 Resume 校验。</p></div><button className="button primary" onClick={() => void runOperation('checkpoint')} disabled={submitting}>{submitting ? '正在校验…' : '校验 Resume 兼容性'}</button></div></section>}
     {section === 'results' && <section className="section-block"><div className="section-heading"><div><h2>结果操作</h2><p>以下操作调用正式指标、绘图规格、导出清单与结果对比 API。</p></div><div className="page-actions"><button className="button secondary" onClick={() => void runOperation('metrics')} disabled={submitting}>读取指标</button><button className="button secondary" onClick={() => void runOperation('plot')} disabled={submitting}>创建绘图</button><button className="button secondary" onClick={() => void runOperation('export')} disabled={submitting}>创建导出</button><button className="button primary" onClick={() => void runOperation('compare')} disabled={submitting}>比较结果</button></div></div></section>}
-    {section === 'experiments' && <section className="section-block"><div className="form-stack"><label>新实验名称<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：Top-30 参数试验" /></label><button className="button primary" onClick={() => void create()} disabled={submitting}><Plus size={15}/>{submitting ? '正在提交…' : '创建并提交实验'}</button></div><p className="form-hint">创建会自动复用已验证的版本化数据、代码、模板与环境配置，随后通过 PATCH 草稿和 submit API 进入队列。</p></section>}
+    {section === 'experiments' && <section className="section-block"><div className="form-stack"><label>新实验名称<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：Top-30 参数试验" /></label><label>可执行代码模板<select value={selectedTemplateVersionId} onChange={event => setSelectedTemplateVersionId(event.target.value)}><option value="">请选择一个代码模板版本</option>{templateOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label><button className="button primary" onClick={() => void create()} disabled={submitting || !templateOptions.length}><Plus size={15}/>{submitting ? '正在提交…' : '创建并提交实验'}</button></div><p className="form-hint">选择的模板固定关联一个不可变代码版本与 argv 训练入口；Runner 会将该版本物化到 <code>/workspace/code</code> 后执行。数据与运行环境暂复用已验证的版本化配置。</p>{!templateOptions.length && <p className="error-notice">尚无可执行模板。请先在“模型代码 / 模板”的代码版本详情中创建训练入口。</p>}</section>}
     <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
     <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
     </section>
@@ -587,7 +661,7 @@ export default function App() {
         <div className="content-area">
           {view === 'dashboard' && <Dashboard openRun={() => setView('run')} openWizard={() => setWizardOpen(true)} openGpu={() => setGpuOpen(true)} />}
           {view === 'datasets' && <ApiCatalogPage section="datasets" />}
-          {view === 'code' && <ApiCatalogPage section="code" />}
+          {view === 'code' && <CodeRepositoryPanel />}
           {view === 'checkpoints' && <ApiCatalogPage section="checkpoints" />}
           {view === 'experiments' && <ApiCatalogPage section="experiments" />}
           {view === 'results' && <ApiCatalogPage section="results" />}
