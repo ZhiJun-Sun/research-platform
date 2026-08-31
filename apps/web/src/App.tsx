@@ -379,6 +379,7 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
   const [items, setItems] = useState<ApiCatalogItem[]>([])
   const [draftName, setDraftName] = useState('')
   const [commandMessage, setCommandMessage] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const config = {
@@ -402,22 +403,30 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
   }
   useEffect(() => { void load() }, [section])
   const create = async () => {
-    if (!draftName.trim()) return
-    setCommandMessage(null); setError(null)
+    if (!draftName.trim()) {
+      setError('请先填写名称再创建')
+      return
+    }
+    setCommandMessage(null); setError(null); setSubmitting(true)
     try {
       await ensureDevSession()
       const created = section === 'datasets'
         ? await createDataset(draftName.trim(), '通过前端真实 API 创建')
         : await createDraft(draftName.trim(), '通过前端真实 API 创建')
-      setCommandMessage(`后端已创建：${created.id}`)
+      setCommandMessage(section === 'datasets'
+        ? `后端已创建数据集「${draftName.trim()}」· ${created.id}`
+        : `后端已创建实验草稿「${draftName.trim()}」· ${created.id}。草稿需配齐数据/代码/模板/环境版本并提交后，才会出现在下方实验列表。`)
       setDraftName('')
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : '创建请求失败') }
+      await load()
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : '创建请求失败')
+    } finally { setSubmitting(false) }
   }
   return <div className="page-stack">
     <header className="page-heading"><div><p className="eyebrow">{config[0]}</p><h1>{config[1]}</h1><p>{config[2]} · 当前内容来自 FastAPI 本地 Fake/InMemory 工作区。</p></div><button className="button secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15}/>{loading ? '加载中' : '刷新'}</button></header>
     {error && <p className="error-notice">API 联调错误：{error}</p>}
     {commandMessage && <p className="onboarding"><b>{commandMessage}</b></p>}
-    {(section === 'datasets' || section === 'experiments') && <section className="section-block"><div className="form-stack"><label>{section === 'datasets' ? '新数据集名称' : '新实验草稿名称'}<input value={draftName} onChange={event => setDraftName(event.target.value)} placeholder={section === 'datasets' ? '例如：北江新增观测 v4' : '例如：Top-30 参数试验'} /></label><button className="button primary" onClick={() => void create()} disabled={!draftName.trim()}><Plus size={15}/>{section === 'datasets' ? '创建数据集' : '创建实验草稿'}</button></div></section>}
+    {(section === 'datasets' || section === 'experiments') && <section className="section-block"><div className="form-stack"><label>{section === 'datasets' ? '新数据集名称' : '新实验草稿名称'}<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder={section === 'datasets' ? '例如：北江新增观测 v4' : '例如：Top-30 参数试验'} /></label><button className="button primary" onClick={() => void create()} disabled={submitting}><Plus size={15}/>{submitting ? '正在提交…' : section === 'datasets' ? '创建数据集' : '创建实验草稿'}</button></div></section>}
     <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
     <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
     </section>
