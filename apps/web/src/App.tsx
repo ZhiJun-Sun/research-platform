@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createDataset, createDatasetImport, createDraft, createExport, createPlot, ensureDevSession, fakeUploadDataset, getDatasetMapping, getRealSection, getWorkspace, listCheckpoints, listDrafts, listMetrics, listResults, seedDemo, submitDraft, updateDraft } from './lib/api'
-import type { ApiCatalogItem, ApiRun } from './lib/api'
+import type { ApiCatalogItem, ApiMappingItem, ApiRun } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -383,8 +383,11 @@ function DatasetImportPanel({ reload }: { reload: () => Promise<void> }) {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [mappingJobId, setMappingJobId] = useState<string | null>(null)
+  const [mappingItems, setMappingItems] = useState<ApiMappingItem[]>([])
   const choose = (files: FileList | null) => setFile(files?.[0] ?? null)
-  const submit = async () => {
+  const updateMapping = (index: number, patch: Partial<ApiMappingItem>) => setMappingItems(items => items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch, user_modified: true } : item))
+  const beginImport = async () => {
     if (!name.trim()) { setError('请填写数据集名称'); return }
     if (!file) { setError('请拖入或选择一个 CSV 文件'); return }
     if (file.size > 2_000_000) { setError('当前本地 Fake/InMemory 联调仅支持不超过 2 MB 的文件；大文件需配置对象存储直传。'); return }
@@ -393,25 +396,34 @@ function DatasetImportPanel({ reload }: { reload: () => Promise<void> }) {
       await ensureDevSession()
       const dataset = await createDataset(name.trim(), description.trim())
       const job = await createDatasetImport(dataset.id)
-      const content = await file.text()
-      await fakeUploadDataset(job.id, file.name, content)
+      await fakeUploadDataset(job.id, file.name, await file.text())
       const mapping = await getDatasetMapping(job.id)
-      const version = await confirmDatasetMapping(job.id, mapping.items)
-      setMessage(`已创建数据集「${name.trim()}」并生成不可变版本 v${version.version_no} · ${version.id.slice(0, 8)}`)
-      setName(''); setDescription(''); setFile(null)
-      await reload()
+      setMappingJobId(job.id)
+      setMappingItems(mapping.items)
+      setMessage('文件已解析。请检查并确认每个字段的语义后，再生成不可变版本。')
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '导入请求失败')
     } finally { setSubmitting(false) }
   }
+  const confirmMapping = async () => {
+    if (!mappingJobId) return
+    const timeFields = mappingItems.filter(item => item.semantic === 'TIME')
+    if (timeFields.length !== 1) { setError(`必须指定且只能指定 1 个时间字段；当前为 ${timeFields.length} 个。`); return }
+    setSubmitting(true); setError(null)
+    try {
+      const version = await confirmDatasetMapping(mappingJobId, mappingItems)
+      setMessage(`字段映射已确认，已生成不可变版本 v${version.version_no} · ${version.id.slice(0, 8)}`)
+      setName(''); setDescription(''); setFile(null); setMappingJobId(null); setMappingItems([])
+      await reload()
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '确认映射失败')
+    } finally { setSubmitting(false) }
+  }
+  const resetMapping = () => { setMappingJobId(null); setMappingItems([]); setMessage(null); setError(null) }
   return <section className="dataset-import-panel">
-    <div className="dataset-import-heading"><div><p className="eyebrow">NEW DATASET</p><h2>新建并导入数据</h2><p>创建数据集后，系统会解析字段映射并生成一个不可变数据版本。</p></div><span className="status-badge neutral">本地联调</span></div>
-    <div className="dataset-import-fields"><label>数据集名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：北江 2023 年小时尺度观测" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：雨量、流量与气象站观测" /></label></div>
-    <input id="dataset-file-picker" className="visually-hidden" type="file" accept=".csv,text/csv" onChange={event => choose(event.target.files)} />
-    <label htmlFor="dataset-file-picker" className={`dataset-drop-zone ${dragging ? 'dragging' : ''}`} onDragOver={event => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); choose(event.dataTransfer.files) }}>
-      <FileUp size={26}/><div><b>{file ? file.name : '拖入 CSV 文件，或点击选择本地文件'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 将作为新版本的原始文件导入` : '当前本地联调支持 CSV，单文件不超过 2 MB'}</span></div>{file && <button type="button" className="button ghost" onClick={event => { event.preventDefault(); setFile(null) }}>移除</button>}
-    </label>
-    <div className="dataset-import-footer"><p>流程：创建数据集 → 上传原始文件 → 自动字段映射 → 确认不可变版本</p><button className="button primary" onClick={() => void submit()} disabled={submitting}><Database size={15}/>{submitting ? '正在导入并生成版本…' : '创建并导入数据集'}</button></div>
+    <div className="dataset-import-heading"><div><p className="eyebrow">NEW DATASET</p><h2>{mappingJobId ? '确认字段映射' : '新建并导入数据'}</h2><p>{mappingJobId ? '映射决定不可变版本中的时间、流域、输入特征与预测目标。' : '创建数据集后先解析字段；由你确认映射后才会生成不可变版本。'}</p></div><span className="status-badge neutral">本地联调</span></div>
+    {!mappingJobId && <><div className="dataset-import-fields"><label>数据集名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：北江 2023 年小时尺度观测" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：雨量、流量与气象站观测" /></label></div><input id="dataset-file-picker" className="visually-hidden" type="file" accept=".csv,text/csv" onChange={event => choose(event.target.files)} /><label htmlFor="dataset-file-picker" className={`dataset-drop-zone ${dragging ? 'dragging' : ''}`} onDragOver={event => { event.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); choose(event.dataTransfer.files) }}><FileUp size={26}/><div><b>{file ? file.name : '拖入 CSV 文件，或点击选择本地文件'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 上传后先进入字段映射确认` : '当前本地联调支持 CSV，单文件不超过 2 MB'}</span></div>{file && <button type="button" className="button ghost" onClick={event => { event.preventDefault(); setFile(null) }}>移除</button>}</label><div className="dataset-import-footer"><p>步骤 1/2：创建数据集并解析 CSV 字段</p><button className="button primary" onClick={() => void beginImport()} disabled={submitting}><FileUp size={15}/>{submitting ? '正在上传并解析…' : '上传并配置字段映射'}</button></div></>}
+    {mappingJobId && <><div className="mapping-review"><div className="mapping-review-head"><b>已检测到 {mappingItems.length} 个字段</b><span>请指定 1 个时间字段；其余字段可标记为流域 ID、特征、目标、静态属性或忽略。</span></div><div className="mapping-review-table"><div><span>原始字段</span><span>字段角色</span><span>标准名称</span><span>单位</span></div>{mappingItems.map((item, index) => <div key={item.source_name}><code>{item.source_name}</code><select value={item.semantic} onChange={event => updateMapping(index, { semantic: event.target.value })}><option value="TIME">时间字段</option><option value="BASIN_ID">流域 ID</option><option value="FEATURE">动态输入特征</option><option value="TARGET">预测目标</option><option value="STATIC">静态属性</option><option value="IGNORE">忽略</option></select><input value={item.standard_name ?? ''} onChange={event => updateMapping(index, { standard_name: event.target.value || null })} /><input value={item.unit ?? ''} onChange={event => updateMapping(index, { unit: event.target.value || null })} placeholder="例如：mm/h" /></div>)}</div></div><div className="dataset-import-footer"><p>步骤 2/2：确认映射后将创建不可变版本，之后不能修改其字段语义。</p><div className="page-actions"><button className="button secondary" onClick={resetMapping} disabled={submitting}>返回修改文件</button><button className="button primary" onClick={() => void confirmMapping()} disabled={submitting}><Check size={15}/>{submitting ? '正在生成版本…' : '确认映射并生成版本'}</button></div></div></>}
     {message && <p className="onboarding"><b>{message}</b></p>}
     {error && <p className="error-notice">数据导入错误：{error}</p>}
   </section>
