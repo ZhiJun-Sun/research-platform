@@ -204,6 +204,33 @@ async def seed(request: Request, user: User = Depends(get_current_user)) -> dict
             MetricPoint(result_id=result.id, name="RMSE", value=8.17),
         ],
     )
+    baseline_draft = await request.app.state.experiment_service.create_draft(
+        user, "Top-4 小样本迁移", "前后端联调对比基线"
+    )
+    await request.app.state.experiment_service.update_draft(
+        user,
+        baseline_draft.id,
+        {
+            "dataset_version_id": data_version.id,
+            "code_version_id": code_version.id,
+            "template_version_id": template_version.id,
+            "environment_version_id": environment_version.id,
+            "parameter_values": {"epochs": 30},
+        },
+    )
+    _, _, baseline_run = await request.app.state.experiment_service.submit(user, baseline_draft.id, "dev-demo-baseline")
+    baseline_started = await request.app.state.run_control_service.start(baseline_run.id, 1)
+    await request.app.state.run_control_service.complete_fake(baseline_started.id, 0)
+    baseline_result = await request.app.state.result_service.create_result(user, baseline_run.id)
+    await request.app.state.result_service.add_metrics(
+        user,
+        baseline_result.id,
+        [
+            MetricPoint(result_id=baseline_result.id, name="NSE", value=0.812),
+            MetricPoint(result_id=baseline_result.id, name="KGE", value=0.892),
+            MetricPoint(result_id=baseline_result.id, name="RMSE", value=9.326),
+        ],
+    )
     return {
         "status": "seeded",
         "experiment_id": str(experiment.id),

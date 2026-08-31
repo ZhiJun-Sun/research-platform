@@ -7,6 +7,12 @@ export type ApiDraft = { id: string; name: string; description: string; dataset_
 export type ApiResult = { id: string; run_id: string; dataset_version_id: string; created_at: string }
 export type ApiCompatibility = { status: 'COMPATIBLE' | 'REPAIRABLE' | 'INCOMPATIBLE'; blockers: string[]; warnings: string[]; repair_plan: { code: string; title: string }[] }
 
+export type ApiSubmitResponse = { experiment: { id: string; name: string; description: string }; version: { id: string; version_no: number }; run: { id: string; status: string } }
+export type ApiMetric = { name: string; value: number; split: string; basin_id: string | null; event_id: string | null }
+export type ApiCheckpoint = { id: string; source_config: Record<string, unknown>; model_signature: string }
+export type ApiComparison = { metrics: Record<string, Record<string, number>>; baseline_result_id: string; dataset_version_id: string }
+export type ApiOperation = { id: string }
+
 type LoginResponse = { tokens: { access_token: string }; user: { display_name: string } }
 type Workspace = { user_name: string; runs: ApiRun[]; gpu_count: number; queued_count: number }
 const TOKEN_KEY = 'hydrolab-api-token'
@@ -71,5 +77,13 @@ export const advanceRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${ru
 export const cancelRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/cancel`, { method: 'POST' })
 export const createDataset = (name: string, description: string) => authed<ApiCatalogItem>('/datasets', { method: 'POST', body: JSON.stringify({ name, description }) })
 export const createDraft = (name: string, description: string) => authed<ApiDraft>('/experiment-drafts', { method: 'POST', body: JSON.stringify({ name, description }) })
-export const checkCheckpoint = (checkpointId: string, mode: string, candidate: Record<string, unknown>) => authed<ApiCompatibility>(`/checkpoints/${checkpointId}/compatibility`, { method: 'POST', body: JSON.stringify({ mode, candidate }) })
+export const listDrafts = () => authed<ApiDraft[]>('/experiment-drafts')
+export const updateDraft = (draftId: string, patch: Partial<Pick<ApiDraft, 'dataset_version_id' | 'code_version_id' | 'template_version_id' | 'environment_version_id' | 'parameter_values'>>) => authed<ApiDraft>(`/experiment-drafts/${draftId}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const submitDraft = (draftId: string) => authed<ApiSubmitResponse>(`/experiment-drafts/${draftId}/submit`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() } })
+export const checkCheckpoint = (checkpointId: string, mode: 'RESUME' | 'FINETUNE' | 'EVALUATE' | 'PREDICT', candidate: Record<string, unknown>) => authed<ApiCompatibility>(`/checkpoints/${checkpointId}/compatibility`, { method: 'POST', body: JSON.stringify({ mode, candidate }) })
+export const listCheckpoints = () => authed<ApiCheckpoint[]>('/checkpoints')
 export const listResults = () => authed<ApiResult[]>('/results')
+export const listMetrics = (resultId: string) => authed<ApiMetric[]>(`/results/${resultId}/metrics`)
+export const compareResults = (resultIds: string[]) => authed<ApiComparison>('/results/compare', { method: 'POST', body: JSON.stringify({ result_ids: resultIds }) })
+export const createPlot = (resultIds: string[]) => authed<ApiOperation>('/plots', { method: 'POST', body: JSON.stringify({ result_ids: resultIds, plot_type: 'hydrograph', data_selection: {}, options: {} }) })
+export const createExport = (resultIds: string[]) => authed<ApiOperation>('/exports', { method: 'POST', body: JSON.stringify({ result_ids: resultIds, artifact_ids: [] }) })

@@ -50,6 +50,14 @@ async def test_dev_demo_seed_creates_real_b2_to_b8_assets(ctx: TestContext) -> N
     for response in (datasets, repositories, templates, environments, experiments, checkpoints, results):
         assert response.status_code == 200, response.text
         assert response.json()
+    assert len(results.json()) == 2
+    compared = await ctx.client.post(
+        "/api/v1/results/compare",
+        json={"result_ids": [item["id"] for item in results.json()]},
+        headers=headers,
+    )
+    assert compared.status_code == 200, compared.text
+    assert len(compared.json()["metrics"]) == 2
 
     repeated = await ctx.client.post("/api/v1/dev-demo/seed", headers=headers)
     assert repeated.json()["status"] == "already_seeded"

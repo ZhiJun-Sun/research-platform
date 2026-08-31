@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, createDataset, createDraft, ensureDevSession, getRealSection, getWorkspace, seedDemo } from './lib/api'
+import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, createDataset, createDraft, createExport, createPlot, ensureDevSession, getRealSection, getWorkspace, listCheckpoints, listDrafts, listMetrics, listResults, seedDemo, submitDraft, updateDraft } from './lib/api'
 import type { ApiCatalogItem, ApiRun } from './lib/api'
 import {
   Activity,
@@ -379,6 +379,7 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
   const [items, setItems] = useState<ApiCatalogItem[]>([])
   const [draftName, setDraftName] = useState('')
   const [commandMessage, setCommandMessage] = useState<string | null>(null)
+  const [operationMessage, setOperationMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -402,6 +403,38 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     } finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [section])
+  const runOperation = async (operation: 'checkpoint' | 'metrics' | 'plot' | 'export' | 'compare') => {
+    setError(null); setOperationMessage(null); setSubmitting(true)
+    try {
+      await ensureDevSession()
+      if (operation === 'checkpoint') {
+        const checkpoint = (await listCheckpoints())[0]
+        if (!checkpoint) throw new Error('没有可校验的 Checkpoint')
+        const report = await checkCheckpoint(checkpoint.id, 'RESUME', { ...checkpoint.source_config, feature_names: ['precip'], target_names: ['flow'], model_signature: checkpoint.model_signature, scaler_signature: 'scaler-v1' })
+        setOperationMessage(`兼容性校验完成：${report.status}${report.blockers.length ? ` · ${report.blockers.join('；')}` : ''}`)
+      } else {
+        const ids = (await listResults()).map(result => result.id)
+        if (!ids.length) throw new Error('没有可操作的结果')
+        if (operation === 'metrics') {
+          const metrics = await listMetrics(ids[0])
+          setOperationMessage(`已读取 ${metrics.length} 条指标：${metrics.map(item => `${item.name}=${item.value}`).join('，')}`)
+        } else if (operation === 'plot') {
+          const plot = await createPlot([ids[0]])
+          setOperationMessage(`绘图规格已创建：${plot.id}`)
+        } else if (operation === 'export') {
+          const exported = await createExport([ids[0]])
+          setOperationMessage(`导出清单已创建：${exported.id}`)
+        } else if (ids.length < 2) {
+          setOperationMessage('结果对比至少需要 2 个同一冻结数据版本的结果；当前只有 1 个。')
+        } else {
+          const comparison = await compareResults(ids.slice(0, 5))
+          setOperationMessage(`结果对比完成：${Object.keys(comparison.metrics).length} 个结果，基线 ${comparison.baseline_result_id.slice(0, 8)}`)
+        }
+      }
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '操作请求失败')
+    } finally { setSubmitting(false) }
+  }
   const create = async () => {
     if (!draftName.trim()) {
       setError('请先填写名称再创建')
@@ -410,12 +443,23 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     setCommandMessage(null); setError(null); setSubmitting(true)
     try {
       await ensureDevSession()
-      const created = section === 'datasets'
-        ? await createDataset(draftName.trim(), '通过前端真实 API 创建')
-        : await createDraft(draftName.trim(), '通过前端真实 API 创建')
-      setCommandMessage(section === 'datasets'
-        ? `后端已创建数据集「${draftName.trim()}」· ${created.id}`
-        : `后端已创建实验草稿「${draftName.trim()}」· ${created.id}。草稿需配齐数据/代码/模板/环境版本并提交后，才会出现在下方实验列表。`)
+      if (section === 'datasets') {
+        const created = await createDataset(draftName.trim(), '通过前端真实 API 创建')
+        setCommandMessage(`后端已创建数据集「${draftName.trim()}」· ${created.id}`)
+      } else {
+        const draft = await createDraft(draftName.trim(), '通过前端真实 API 创建')
+        const configuredDraft = (await listDrafts()).find(item => item.status === 'SUBMITTED' && item.dataset_version_id && item.code_version_id && item.template_version_id && item.environment_version_id)
+        if (!configuredDraft) throw new Error('未找到可复用的完整联调配置')
+        await updateDraft(draft.id, {
+          dataset_version_id: configuredDraft.dataset_version_id,
+          code_version_id: configuredDraft.code_version_id,
+          template_version_id: configuredDraft.template_version_id,
+          environment_version_id: configuredDraft.environment_version_id,
+          parameter_values: { ...configuredDraft.parameter_values, epochs: 50 },
+        })
+        const submitted = await submitDraft(draft.id)
+        setCommandMessage(`实验「${submitted.experiment.name}」已提交 · Run ${submitted.run.id.slice(0, 8)} 已进入 ${submitted.run.status} 队列`)
+      }
       setDraftName('')
       await load()
     } catch (cause) {
@@ -426,7 +470,10 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     <header className="page-heading"><div><p className="eyebrow">{config[0]}</p><h1>{config[1]}</h1><p>{config[2]} · 当前内容来自 FastAPI 本地 Fake/InMemory 工作区。</p></div><button className="button secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15}/>{loading ? '加载中' : '刷新'}</button></header>
     {error && <p className="error-notice">API 联调错误：{error}</p>}
     {commandMessage && <p className="onboarding"><b>{commandMessage}</b></p>}
-    {(section === 'datasets' || section === 'experiments') && <section className="section-block"><div className="form-stack"><label>{section === 'datasets' ? '新数据集名称' : '新实验草稿名称'}<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder={section === 'datasets' ? '例如：北江新增观测 v4' : '例如：Top-30 参数试验'} /></label><button className="button primary" onClick={() => void create()} disabled={submitting}><Plus size={15}/>{submitting ? '正在提交…' : section === 'datasets' ? '创建数据集' : '创建实验草稿'}</button></div></section>}
+    {operationMessage && <p className="onboarding"><b>{operationMessage}</b></p>}
+    {section === 'checkpoints' && <section className="section-block"><div className="section-heading"><div><h2>复用兼容性校验</h2><p>使用当前 Checkpoint 的冻结来源配置执行 Resume 校验。</p></div><button className="button primary" onClick={() => void runOperation('checkpoint')} disabled={submitting}>{submitting ? '正在校验…' : '校验 Resume 兼容性'}</button></div></section>}
+    {section === 'results' && <section className="section-block"><div className="section-heading"><div><h2>结果操作</h2><p>以下操作调用正式指标、绘图规格、导出清单与结果对比 API。</p></div><div className="page-actions"><button className="button secondary" onClick={() => void runOperation('metrics')} disabled={submitting}>读取指标</button><button className="button secondary" onClick={() => void runOperation('plot')} disabled={submitting}>创建绘图</button><button className="button secondary" onClick={() => void runOperation('export')} disabled={submitting}>创建导出</button><button className="button primary" onClick={() => void runOperation('compare')} disabled={submitting}>比较结果</button></div></div></section>}
+    {(section === 'datasets' || section === 'experiments') && <section className="section-block"><div className="form-stack"><label>{section === 'datasets' ? '新数据集名称' : '新实验名称'}<input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder={section === 'datasets' ? '例如：北江新增观测 v4' : '例如：Top-30 参数试验'} /></label><button className="button primary" onClick={() => void create()} disabled={submitting}><Plus size={15}/>{submitting ? '正在提交…' : section === 'datasets' ? '创建数据集' : '创建并提交实验'}</button></div>{section === 'experiments' && <p className="form-hint">创建会自动复用已验证的版本化数据、代码、模板与环境配置，随后通过 PATCH 草稿和 submit API 进入队列。</p>}</section>}
     <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
     <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
     </section>
