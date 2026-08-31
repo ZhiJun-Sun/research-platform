@@ -63,9 +63,19 @@ npm run build
 
 ## 当前接入范围
 
-- **运行中心**：已接入 FastAPI `/auth/login` 和仅 local/test 启用的受保护 Demo 工作区 API；真实展示 Fake Runner 的任务列表，并支持推进/取消状态操作。浏览器已验证任务加载、推进与 Token 重启恢复。
-- **其他页面**：数据、代码、实验、Checkpoint、结果与对比仍保留交互原型数据。后端已具备相应 B1–B8 API，但尚待按页面替换为真实 API Client。
-- **训练执行**：当前是 Fake/InMemory Runner，不会启动真实训练或占用服务器 GPU。
+- **运行中心**：接入 FastAPI `/auth/login` 与仅 local/test 启用的受保护执行面 API，展示 Fake Runner 任务并支持推进/取消。
+- **数据 / 模型代码 / 模板 / 环境 / 实验 / Checkpoint / 结果与对比**：均通过正式业务端点读取（`/datasets`、`/code-repositories`、`/templates`、`/environments`、`/experiments`、`/checkpoints`、`/results`）。页面加载时会调用幂等的 `POST /dev-demo/seed`，由后端按 B2–B8 领域服务真实创建 DatasetVersion、CodeVersion、TemplateVersion、EnvironmentVersion、Experiment、Run、Checkpoint、Result 与指标。
+- **可写操作**：数据页可真实 `POST /datasets`，实验页可真实 `POST /experiment-drafts`。
+- **尚未迁移**：实验向导的分步提交、Run 详情的事件/日志/SSE、结果详情的绘图与导出交互仍为原型 UI。
+- **训练执行**：Fake/InMemory Runner，不会启动真实训练或占用 GPU。
+
+## 联调验证
+
+```bash
+./scripts/verify-integration.sh http://127.0.0.1:5176
+```
+
+脚本经前端代理校验登录、初始化、七个业务端点、运行中心与未认证 401 边界，所有请求均带超时。
 
 ## 原型范围
 

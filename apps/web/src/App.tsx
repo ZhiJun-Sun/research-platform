@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, ensureDevSession, getWorkspace } from './lib/api'
-import type { ApiRun } from './lib/api'
+import { advanceRun, ApiError, cancelRun, createDataset, createDraft, ensureDevSession, getRealSection, getWorkspace, seedDemo } from './lib/api'
+import type { ApiCatalogItem, ApiRun } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -375,6 +375,55 @@ function ExperimentWizard({ close }: { close: () => void }) {
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="创建实验"><div className="wizard-modal"><header><div><span className="mono-label">NEW EXPERIMENT</span><h2>创建训练实验</h2><p>向导与高级模式共享同一份实验草稿。</p></div><div className="mode-switch"><button className={createMode === 'wizard' ? 'active' : ''} onClick={() => setCreateMode('wizard')}>分步向导</button><button className={createMode === 'advanced' ? 'active' : ''} onClick={() => setCreateMode('advanced')}>高级配置</button><button className="icon-button" onClick={close} aria-label="关闭"><X size={18} /></button></div></header>{createMode === 'advanced' ? <div className="advanced-body"><div className="advanced-intro"><span className="step-counter">ADVANCED CONFIG</span><h3>完整实验配置</h3><p>按区域展开并一次完成全部配置。字段与分步向导保持同步。</p></div><AdvancedExperimentForm /></div> : <div className="wizard-body"><aside>{steps.map((label, i) => <button className={step === i + 1 ? 'active' : step > i + 1 ? 'done' : ''} onClick={() => setStep(i + 1)} key={label}><span>{step > i + 1 ? <Check size={13} /> : i + 1}</span><div><b>{label}</b><small>{['模型与代码版本','目标数据版本','初始化与 Checkpoint','超参数与资源','检查后进入队列'][i]}</small></div></button>)}</aside><main><span className="step-counter">STEP {step} / 5</span><h3>{steps[step - 1]}</h3>{step === 1 && <div className="selection-list"><button className="selected"><FileCode2 /><div><b>KG-MoE-MS</b><span>commit 8fc2a1 · PyTorch 2.4 · CUDA 12.4</span></div><Check /></button><button><FileCode2 /><div><b>GRU Baseline</b><span>commit e921d0 · PyTorch 2.4 · CUDA 12.4</span></div></button><button><FileCode2 /><div><b>NeuralHydrology</b><span>v1.12.0 · 标准适配器</span></div></button></div>}{step === 2 && <div className="form-stack"><label>目标数据版本<select><option>北江目标流域 · v3</option><option>CAMELS-US · v2</option></select></label><div className="data-preview"><Database /><div><b>北江目标流域 v3</b><span>33 个流域 · 2012—2022 · 1 hour</span></div><StatusBadge status="已完成" /></div></div>}{step === 3 && <div className="mode-grid">{[['scratch','从头训练'],['resume','断点续训'],['finetune','跨数据集微调'],['evaluate','仅评估']].map(([id,label],i) => <button className={i === 2 ? 'selected' : ''} key={id}><b>{label}</b><span>{id}</span>{i === 2 && <Check />}</button>)}</div>}{step === 4 && <div><ParameterEditor/><div className="parameter-grid runtime-fields"><label>GPU 资源<select><option>自动分配单张 GPU</option></select></label><label>优先级<select><option>普通</option></select></label></div></div>}{step === 5 && <div className="review-list"><div><span>模型代码</span><b>KG-MoE-MS · 8fc2a1</b></div><div><span>数据版本</span><b>北江目标流域 · v3</b></div><div><span>训练方式</span><b>跨数据集微调</b></div><div><span>初始权重</span><b>CAMELS Best · epoch 42</b></div><div><span>资源估算</span><b>单 GPU · 约 3 小时</b></div></div>}</main></div>}<footer><button className="button secondary" onClick={createMode === 'wizard' && step > 1 ? () => setStep(step - 1) : close}>{createMode === 'wizard' && step > 1 ? '返回上一步' : '暂不创建'}</button><button className="button primary" onClick={createMode === 'wizard' && step < 5 ? () => setStep(step + 1) : close}>{createMode === 'wizard' && step < 5 ? '继续下一步' : '创建并进入队列'}<ChevronRight size={15} /></button></footer></div></div>
 }
 
+function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' | 'environments' }) {
+  const [items, setItems] = useState<ApiCatalogItem[]>([])
+  const [draftName, setDraftName] = useState('')
+  const [commandMessage, setCommandMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const config = {
+    datasets: ['DATA', '数据', '不可变数据版本与字段映射'],
+    code: ['MODEL CODE', '模型代码 / 模板', '代码快照与可执行实验模板'],
+    experiments: ['EXPERIMENTS', '实验', '冻结配置与独立 Run 历史'],
+    checkpoints: ['CHECKPOINTS', 'Checkpoint', '可复用模型权重与兼容性结论'],
+    results: ['RESULTS', '结果与对比', '成功 Run 的指标、产物与可比性'],
+    environments: ['RUNTIME ASSETS', '运行环境', '版本化镜像与依赖锁定'],
+  }[section]
+  const load = async () => {
+    setLoading(true); setError(null)
+    try {
+      await ensureDevSession()
+      await seedDemo()
+      const loadedItems = await getRealSection(section)
+      setItems(loadedItems)
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : '无法连接本地 API')
+    } finally { setLoading(false) }
+  }
+  useEffect(() => { void load() }, [section])
+  const create = async () => {
+    if (!draftName.trim()) return
+    setCommandMessage(null); setError(null)
+    try {
+      await ensureDevSession()
+      const created = section === 'datasets'
+        ? await createDataset(draftName.trim(), '通过前端真实 API 创建')
+        : await createDraft(draftName.trim(), '通过前端真实 API 创建')
+      setCommandMessage(`后端已创建：${created.id}`)
+      setDraftName('')
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : '创建请求失败') }
+  }
+  return <div className="page-stack">
+    <header className="page-heading"><div><p className="eyebrow">{config[0]}</p><h1>{config[1]}</h1><p>{config[2]} · 当前内容来自 FastAPI 本地 Fake/InMemory 工作区。</p></div><button className="button secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15}/>{loading ? '加载中' : '刷新'}</button></header>
+    {error && <p className="error-notice">API 联调错误：{error}</p>}
+    {commandMessage && <p className="onboarding"><b>{commandMessage}</b></p>}
+    {(section === 'datasets' || section === 'experiments') && <section className="section-block"><div className="form-stack"><label>{section === 'datasets' ? '新数据集名称' : '新实验草稿名称'}<input value={draftName} onChange={event => setDraftName(event.target.value)} placeholder={section === 'datasets' ? '例如：北江新增观测 v4' : '例如：Top-30 参数试验'} /></label><button className="button primary" onClick={() => void create()} disabled={!draftName.trim()}><Plus size={15}/>{section === 'datasets' ? '创建数据集' : '创建实验草稿'}</button></div></section>}
+    <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
+    <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
+    </section>
+  </div>
+}
+
 export default function App() {
   const [view, setView] = useState<View>('dashboard')
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -426,13 +475,13 @@ export default function App() {
         </div>
         <div className="content-area">
           {view === 'dashboard' && <Dashboard openRun={() => setView('run')} openWizard={() => setWizardOpen(true)} openGpu={() => setGpuOpen(true)} />}
-          {view === 'datasets' && <Assets initialKind="dataset" openDatasetCreate={() => setDatasetCreateOpen(true)} />}
-          {view === 'code' && <Assets initialKind="code" />}
-          {view === 'checkpoints' && <Assets initialKind="checkpoint" />}
-          {view === 'experiments' && <ExperimentList openRun={() => setView('run')} openWizard={() => setWizardOpen(true)} />}
-          {view === 'results' && (compareRuns.length ? <RunComparison selected={compareRuns} back={() => setCompareRuns([])} /> : resultDetailOpen ? <ResultDetail back={() => setResultDetailOpen(false)} /> : <ResultIndex openDetail={() => setResultDetailOpen(true)} openCompare={setCompareRuns} />)}
+          {view === 'datasets' && <ApiCatalogPage section="datasets" />}
+          {view === 'code' && <ApiCatalogPage section="code" />}
+          {view === 'checkpoints' && <ApiCatalogPage section="checkpoints" />}
+          {view === 'experiments' && <ApiCatalogPage section="experiments" />}
+          {view === 'results' && <ApiCatalogPage section="results" />}
           {view === 'permissions' && <AssetAdminPage type="permissions" />}
-          {view === 'environments' && <AssetAdminPage type="environments" />}
+          {view === 'environments' && <ApiCatalogPage section="environments" />}
           {view === 'run' && <RunDetail back={() => setView('dashboard')} />}
         </div>
       </main>

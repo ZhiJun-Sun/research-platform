@@ -16,6 +16,9 @@ class InMemoryResults:
     async def get(self, item_id: UUID) -> Result | None:
         return self.items.get(item_id)
 
+    async def list_by_owner(self, owner_id: UUID) -> list[Result]:
+        return [item for item in self.items.values() if item.owner_id == owner_id]
+
     async def list_by_run(self, run_id: UUID) -> list[Result]:
         return [item for item in self.items.values() if item.run_id == run_id]
 

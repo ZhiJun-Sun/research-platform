@@ -37,6 +37,9 @@ async def test_result_metrics_plot_and_export_are_traceable(ctx: TestContext) ->
     assert plot.status_code == 201, plot.text
     exported = await ctx.client.post("/api/v1/exports", json={"result_ids": [result_id]}, headers=headers)
     assert exported.status_code == 201, exported.text
+    listed = await ctx.client.get("/api/v1/results", headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert [item["id"] for item in listed.json()] == [result_id]
 
 
 async def test_compare_rejects_results_from_different_dataset_versions(ctx: TestContext) -> None:

@@ -42,6 +42,11 @@ class CompareInput(BaseModel):
     result_ids: list[UUID]
 
 
+@router.get("/results")
+async def list_results(request: Request, user: User = Depends(get_current_user)) -> object:
+    return await request.app.state.results.list_by_owner(user.id)
+
+
 @router.post("/runs/{run_id}/result", status_code=201)
 async def create_result(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> object:
     return await request.app.state.result_service.create_result(user, run_id)
