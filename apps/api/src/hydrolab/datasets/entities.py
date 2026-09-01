@@ -96,6 +96,8 @@ class DatasetImportJob(BaseModel):
     source_version_id: UUID | None = None
     artifact_id: UUID | None = None
     detected_format: DataFormat = DataFormat.UNKNOWN
+    # BUNDLE 格式下的包内文件清单（探测阶段写入，供冻结与物化使用）
+    bundle_entries: list[str] = Field(default_factory=list)
     progress: int = Field(default=0, ge=0, le=100)
     error_code: str | None = None
     error_message: str | None = None

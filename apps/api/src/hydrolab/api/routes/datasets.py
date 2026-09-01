@@ -1,5 +1,7 @@
 """B2 数据/文件夹/导入 API。"""
 
+import base64
+import binascii
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -17,6 +19,7 @@ from hydrolab.api.dataset_schemas import (
     VersionView,
 )
 from hydrolab.auth.dependencies import get_current_user
+from hydrolab.core.errors import validation_error
 from hydrolab.datasets.entities import (
     AssetFolder,
     Dataset,
@@ -150,8 +153,17 @@ async def get_import(
 async def fake_upload(
     job_id: UUID, body: FakeUpload, request: Request, user: User = Depends(get_current_user)
 ) -> ImportView:
+    if body.content_encoding == "base64":
+        try:
+            payload = base64.b64decode(body.content, validate=True)
+        except (ValueError, binascii.Error) as cause:
+            raise validation_error(
+                "content 不是合法的 base64", {"filename": body.filename}
+            ) from cause
+    else:
+        payload = body.content.encode()
     job = await request.app.state.import_service.fake_upload(
-        user, job_id, body.filename, body.content.encode()
+        user, job_id, body.filename, payload
     )
     return _import_view(job)
 

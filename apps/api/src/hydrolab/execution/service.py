@@ -8,7 +8,7 @@
 import asyncio
 import json
 from datetime import timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import UUID
 
@@ -48,6 +48,8 @@ class RunControlService:
         template_versions: Any | None = None,
         storage: Any | None = None,
         collector: ArtifactCollector | None = None,
+        dataset_versions: Any | None = None,
+        artifacts: Any | None = None,
     ) -> None:
         self._runs, self._outbox, self._leases, self._executions = runs, outbox, leases, executions
         self._events, self._logs, self._samples, self._queue, self._executor = events, logs, samples, queue, executor
@@ -56,6 +58,8 @@ class RunControlService:
         self._template_versions = template_versions
         self._storage = storage
         self._collector = collector
+        self._dataset_versions = dataset_versions
+        self._artifacts = artifacts
         self._reports: dict[UUID, CollectionReport] = {}
 
     @property
@@ -144,13 +148,23 @@ class RunControlService:
             raise conflict("冻结代码版本缺少对象内容，无法物化执行")
 
         archive = self._read_object(code.object_key)
-        workspace = self._executor.prepare_workspace(run.id, archive)  # type: ignore[attr-defined]
+        dataset_version_id = config.get("dataset_version_id")
+        dataset_files = await self._materialize_dataset(dataset_version_id)
+        workspace = self._executor.prepare_workspace(  # type: ignore[attr-defined]
+            run.id, archive, dataset_files
+        )
 
         argv = self._render_argv(argv, config.get("parameters") or {}, run)
         await self._event(
             EventType.STAGE_CHANGED,
             run.id,
-            {"stage": "PREPARING", "workspace": str(workspace), "argv": argv},
+            {
+                "stage": "PREPARING",
+                "workspace": str(workspace),
+                "argv": argv,
+                "dataset_version_id": str(dataset_version_id) if dataset_version_id else None,
+                "dataset_file_count": len(dataset_files) if dataset_files else 0,
+            },
         )
         return RunSpec(
             run_id=run.id,
@@ -181,6 +195,59 @@ class RunControlService:
             rendered.append(text)
         return rendered
 
+    async def _materialize_dataset(self, dataset_version_id: Any) -> dict[str, bytes] | None:
+        """把冻结数据集版本的内容取回为 {相对路径: 字节}。
+
+        返回 None 表示未选定数据版本或缺少仓储注入，此时 Runner 回落到
+        全局 DATA_ROOT 兼容路径。选定了数据版本就必须能取到内容，
+        取不到宁可让 Run 失败，也不能静默跑到别的数据上——那会产出
+        无法追溯的结果。
+
+        BUNDLE 格式按 zip 内原始相对路径展开；单文件格式直接落为同名文件。
+        """
+        if not dataset_version_id:
+            return None
+        if self._dataset_versions is None or self._artifacts is None:
+            return None
+        version = await self._dataset_versions.get(UUID(str(dataset_version_id)))
+        if version is None:
+            raise conflict("Run 选定的数据集版本不存在", {"dataset_version_id": str(dataset_version_id)})
+
+        manifest = version.manifest or {}
+        artifact_id = manifest.get("artifact_id")
+        if not artifact_id:
+            raise conflict("数据集版本缺少源文件登记，无法物化")
+        artifact = await self._artifacts.get(UUID(str(artifact_id)))
+        if artifact is None or not artifact.object_key:
+            raise conflict("数据集源文件缺少对象内容，无法物化")
+
+        payload = self._read_object(artifact.object_key)
+        if str(manifest.get("format") or "").upper() == "BUNDLE":
+            return self._expand_bundle(payload)
+
+        # 单文件：保留原始文件名，使训练代码的 datasets/<name> 相对路径生效
+        filename = PurePosixPath(artifact.object_key).name
+        return {filename: payload}
+
+    @staticmethod
+    def _expand_bundle(payload: bytes) -> dict[str, bytes]:
+        """展开数据包 zip；导入期已校验过安全性，此处再做一次纵深防御。"""
+        import io
+        import zipfile
+
+        files: dict[str, bytes] = {}
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                name = info.filename
+                if name.startswith("/") or ".." in PurePosixPath(name).parts:
+                    raise validation_error("数据包含非法路径", {"path": name})
+                files[name] = archive.read(info)
+        if not files:
+            raise conflict("数据集版本内容为空，无法物化")
+        return files
+
     def _read_object(self, key: str) -> bytes:
         if self._storage is None:
             raise validation_error("真实 Runner 需要注入对象存储")
@@ -193,7 +260,7 @@ class RunControlService:
         if isinstance(objects, dict) and key in objects:
             payload = objects[key]
             return payload if isinstance(payload, bytes) else bytes(payload)
-        raise conflict("对象存储中找不到冻结代码内容", {"key": key})
+        raise conflict("对象存储中找不到冻结内容", {"key": key})
 
     async def await_completion(self, run_id: UUID, timeout: float | None = None) -> Run:
         """等待真实执行结束，随后采集产物并落地结果。"""

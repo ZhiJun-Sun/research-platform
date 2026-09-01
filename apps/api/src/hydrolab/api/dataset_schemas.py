@@ -1,6 +1,6 @@
 """B2 数据 API Schema。"""
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -51,6 +51,8 @@ class ImportCreate(BaseModel):
 class FakeUpload(BaseModel):
     filename: str
     content: str
+    # xlsx/zip 等二进制数据必须以 base64 传输；文本格式（csv）可直接传原文。
+    content_encoding: Literal["text", "base64"] = "text"
 
 
 class MappingItem(BaseModel):

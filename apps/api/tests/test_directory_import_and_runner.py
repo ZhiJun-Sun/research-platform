@@ -248,3 +248,124 @@ async def test_subprocess_executor_cancel_terminates_process(tmp_path: Path) -> 
     await executor.cancel(handle)
     status = await executor.wait(handle.external_id, timeout=60)
     assert status.state.value == "CANCELLED"
+
+
+async def test_prepare_workspace_materializes_selected_dataset(tmp_path: Path) -> None:
+    """选定的数据集内容必须真正落到 code/datasets/ 并被训练代码读到。
+
+    这是"选好数据集就能跑"的核心契约：以前 prepare_workspace 只物化代码，
+    数据靠全局软链接，导致选哪个数据版本都跑同一份数据。
+    """
+    source = tmp_path / "proj"
+    source.mkdir()
+    # 训练代码按 da0 的习惯用相对路径读取 datasets/
+    (source / "main.py").write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "target = Path('datasets/81000200.csv').read_text()",
+                "static = Path('datasets/camels/static.csv').read_text()",
+                "print('basin=' + target.strip(), flush=True)",
+                "print('static=' + static.strip(), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    lines: list[str] = []
+
+    async def sink(run_id: object, line: str) -> None:
+        lines.append(line)
+
+    executor = SubprocessRunExecutor(
+        workspace_root=tmp_path / "ws", python_executable=sys.executable, log_sink=sink
+    )
+    run_id = uuid4()
+    executor.prepare_workspace(
+        run_id,
+        snapshot_directory(source).archive,
+        {
+            "81000200.csv": b"flow-of-basin-81000200",
+            "camels/static.csv": b"static-attributes",
+        },
+    )
+
+    workspace = executor.workspace_for(run_id)
+    # 子目录结构必须保留，而不是被拍平
+    assert (workspace / "code" / "datasets" / "81000200.csv").is_file()
+    assert (workspace / "code" / "datasets" / "camels" / "static.csv").is_file()
+
+    handle = await executor.start(
+        RunSpec(run_id=run_id, argv=["python", "main.py"], image_digest="local:subprocess")
+    )
+    status = await executor.wait(handle.external_id, timeout=120)
+    assert status.exit_code == 0, "".join(lines)
+    assert any("basin=flow-of-basin-81000200" in line for line in lines)
+    assert any("static=static-attributes" in line for line in lines)
+
+
+async def test_dataset_materialization_replaces_global_symlink(tmp_path: Path) -> None:
+    """选定数据版本时，必须摘掉全局 DATA_ROOT 软链接。
+
+    否则写入会穿透到共享只读目录：既污染别人的数据，又让"跑的是哪份数据"
+    无法追溯。
+    """
+    global_data = tmp_path / "global_data"
+    global_data.mkdir()
+    (global_data / "shared.csv").write_text("shared-and-must-not-be-touched", encoding="utf-8")
+
+    source = tmp_path / "proj"
+    source.mkdir()
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+
+    executor = SubprocessRunExecutor(
+        workspace_root=tmp_path / "ws",
+        python_executable=sys.executable,
+        data_root=global_data,
+    )
+    run_id = uuid4()
+    executor.prepare_workspace(
+        run_id, snapshot_directory(source).archive, {"only.csv": b"picked-version"}
+    )
+
+    datasets_dir = executor.workspace_for(run_id) / "code" / "datasets"
+    assert not datasets_dir.is_symlink(), "选定数据版本后不应残留全局软链接"
+    assert (datasets_dir / "only.csv").read_bytes() == b"picked-version"
+    # 全局共享数据不应出现在本次 Run 的视野里，也不应被改动
+    assert not (datasets_dir / "shared.csv").exists()
+    assert (global_data / "shared.csv").read_text() == "shared-and-must-not-be-touched"
+
+
+async def test_dataset_materialization_rejects_path_traversal(tmp_path: Path) -> None:
+    """数据集文件名不得穿越出 datasets 目录。"""
+    source = tmp_path / "proj"
+    source.mkdir()
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+    executor = SubprocessRunExecutor(
+        workspace_root=tmp_path / "ws", python_executable=sys.executable
+    )
+    with pytest.raises(AppError):
+        executor.prepare_workspace(
+            uuid4(),
+            snapshot_directory(source).archive,
+            {"../../escaped.csv": b"evil"},
+        )
+
+
+async def test_fallback_to_global_data_root_when_no_dataset_selected(tmp_path: Path) -> None:
+    """未选定数据版本时保留原有软链接兼容行为，不破坏既有联调流程。"""
+    global_data = tmp_path / "global_data"
+    global_data.mkdir()
+    (global_data / "legacy.csv").write_text("legacy", encoding="utf-8")
+    source = tmp_path / "proj"
+    source.mkdir()
+    (source / "main.py").write_text("print('ok')\n", encoding="utf-8")
+    executor = SubprocessRunExecutor(
+        workspace_root=tmp_path / "ws",
+        python_executable=sys.executable,
+        data_root=global_data,
+    )
+    run_id = uuid4()
+    executor.prepare_workspace(run_id, snapshot_directory(source).archive, None)
+    datasets_dir = executor.workspace_for(run_id) / "code" / "datasets"
+    assert (datasets_dir / "legacy.csv").read_text() == "legacy"

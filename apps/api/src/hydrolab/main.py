@@ -211,6 +211,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         template_versions=app.state.template_versions,
         storage=storage,
         collector=ArtifactCollector(storage),
+        # 数据集仓储：让 Run 选定的数据版本被真正物化进工作目录，
+        # 而不是回落到全局 DATA_ROOT 软链接。
+        dataset_versions=app.state.dataset_versions,
+        artifacts=app.state.artifacts,
     )
 
     # 首个管理员 bootstrap：仅系统无用户时执行一次

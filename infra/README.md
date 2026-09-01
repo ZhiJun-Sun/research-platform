@@ -51,16 +51,33 @@ HYDROLAB_LOCAL_STORAGE_ROOT=/srv/hydrolab/objects
 HYDROLAB_RUN_EXECUTOR_BACKEND=subprocess
 HYDROLAB_RUNNER_WORKSPACE_ROOT=/srv/hydrolab/runs
 HYDROLAB_RUNNER_PYTHON_EXECUTABLE=/usr/bin/python3   # 需含 torch 等训练依赖
-HYDROLAB_RUNNER_DATA_ROOT=/srv/hydrolab/datasets     # 以 code/datasets 只读软链接暴露
+HYDROLAB_RUNNER_DATA_ROOT=/srv/hydrolab/datasets     # 可选：未选定数据版本时的兼容兜底
 HYDROLAB_CODE_IMPORT_ROOTS=["/srv/projects"]         # 目录导入白名单
 ```
+
+#### 数据如何进入训练进程
+
+数据有两条互斥路径，**前者优先**：
+
+| 路径 | 触发条件 | 可追溯性 |
+| --- | --- | --- |
+| 冻结数据版本物化 | Run 所属实验版本含 `dataset_version_id` | ✅ 跑的是哪份数据完全确定 |
+| 全局目录软链接 | 未选定数据版本且配了 `DATA_ROOT` | ❌ 仅兼容早期联调 |
+
+选定数据版本时，平台从对象存储取回该版本全部文件、按包内原始相对路径写入
+`<workspace>/<run_id>/code/datasets/`，使训练代码原生的 `datasets/<流域>.xlsx`
+相对路径直接命中；同时会摧除可能残留的全局软链接，避免写入穿透到共享只读目录。
+
+数据集支持的格式：`CSV` / `PARQUET` / `NETCDF` / `XLSX` / `BUNDLE`。
+其中 `BUNDLE`（zip）用于一个版本内含多文件与子目录的场景（水文数据常见：
+多流域时序表 + 静态属性 + 子目录），导入时会清点内容并拒绝路径穿越与解压炸弹。
 
 链路语义：
 
 1. `POST /code-import-previews` 只读扫描目录，排除 `.venv`/缓存/数据/既有产物；
 2. `POST /code-repositories/{id}/directory-imports` 把目录固化为**确定性 ZIP** 并写入对象存储，得到不可变 CodeVersion；
 3. 实验提交后冻结 ExperimentVersion（含 argv 与参数）；
-4. `POST /runs/{id}/start` 在 `<workspace>/<run_id>/{code,output}` 中物化代码、软链数据，并以进程组方式真实执行 argv（从不经过 shell）；
+4. `POST /runs/{id}/start` 在 `<workspace>/<run_id>/{code,output}` 中物化代码**与选定的数据版本**，并以进程组方式真实执行 argv（从不经过 shell）；
 5. stdout 逐行回流到 Run 日志；`POST /runs/{id}/await` 等待结束；
 6. 结束后自动采集 metrics/checkpoint/predictions/plot，`Infinity`/`NaN` 被消毒为空值；
 7. `POST /runs/{id}/result/ingest` 一次性登记 Result + Metrics + Artifacts，前端即可绘图、对比、导出。
@@ -72,7 +89,9 @@ cd apps/api
 uv run python ../../scripts/verify_da0_e2e.py --source /srv/projects/da0 --epochs 1
 ```
 
-脚本会真实训练并逐项校验代码导入、执行、日志、产物采集、结果登记与落盘，全部通过时退出码为 0。
+脚本会真实训练并逐项校验代码导入、数据包冻结、执行、日志、产物采集、结果登记与落盘，全部通过时退出码为 0。
+它会把 `da0/datasets` 顶层数据文件打成 BUNDLE 上传并冻结为真实数据版本，
+因此即使不配 `HYDROLAB_RUNNER_DATA_ROOT` 也能跑通——这正是“选数据集就能跑”生效的证据。
 
 > **安全边界**：subprocess Runner 与 API 同主机同用户运行，**没有容器隔离**，因此 `validate_production()` 会在 `HYDROLAB_ENVIRONMENT=production` 时直接拒绝启动。它的定位是"Docker GPU Runner 落地前的可用实现"，只应在受控内网单机使用；对外多租户场景必须等下表的 Docker GPU 门禁通过。
 

@@ -11,7 +11,8 @@
 说明：
 - 直接在进程内驱动 FastAPI 应用（httpx ASGI），全链路走真实 HTTP 语义，无需另起服务；
 - Runner 采用 subprocess 后端，真实执行 da0/main.py，因此耗时取决于 epochs；
-- 数据不进代码包：da0/datasets 以只读数据根挂载进工作目录。
+- 数据不进代码包：顶层数据文件打成 BUNDLE 冻结为 DatasetVersion，
+  由 Runner 按 Run 选定的数据版本物化进 code/datasets/，跑哪份数据可追溯。
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import io
 import json
 import os
 import sys
@@ -31,6 +33,30 @@ sys.path.insert(0, str(REPO_ROOT / "apps" / "api" / "src"))
 
 def _fmt(seconds: float) -> str:
     return f"{seconds:.1f}s"
+
+
+def _build_dataset_bundle(datasets_dir: Path) -> tuple[bytes, int]:
+    """把 da0 顶层数据文件打成 BUNDLE zip，供真实数据集版本使用。
+
+    只收顶层文件（xlsx/csv/txt）：camels_hourly/ 有 2.7GB，本验收不启用
+    CAMELS（--include_camels 未开），没必要塞进版本里。真实需要 CAMELS 时
+    应单独建一个数据集版本。
+    """
+    import zipfile
+
+    buffer = io.BytesIO()
+    count = 0
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(datasets_dir.iterdir()):
+            if not path.is_file() or path.name.startswith("."):
+                continue
+            if path.suffix.lower() not in {".xlsx", ".xls", ".csv", ".txt"}:
+                continue
+            archive.write(path, arcname=path.name)
+            count += 1
+    if count == 0:
+        raise SystemExit(f"数据目录中没有可打包的数据文件: {datasets_dir}")
+    return buffer.getvalue(), count
 
 
 class Reporter:
@@ -165,14 +191,21 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
             if not report.expect(job, 201, "创建数据导入任务"):
                 return 1
             job_id = job.json()["id"]
-            # 上传 da0 数据目录的字段样本，让映射来自真实列名
-            sample = "date,basin_id,precip,flow\n2022-01-01 00:00:00," + basin + ",2.4,7.1\n"
+            # 上传真实数据包：把 da0/datasets 打成 BUNDLE 上传，
+            # 使"网页选定的数据集"真正决定训练读到什么数据，而非依赖全局挂载。
+            bundle, entry_count = _build_dataset_bundle(source / "datasets")
             uploaded = await client.post(
                 f"{api}/dataset-imports/{job_id}/fake-upload",
-                json={"filename": f"{basin}.csv", "content": sample},
+                json={
+                    "filename": "da0-datasets.zip",
+                    "content": base64.b64encode(bundle).decode(),
+                    "content_encoding": "base64",
+                },
                 headers=headers,
             )
-            if not report.expect(uploaded, 200, "上传数据样本并解析字段"):
+            if not report.expect(
+                uploaded, 200, f"上传真实数据包（{entry_count} 个文件，{len(bundle) / 1024**2:.1f} MB）"
+            ):
                 return 1
             mapping = await client.get(f"{api}/dataset-imports/{job_id}/mapping", headers=headers)
             if not report.expect(mapping, 200, "读取字段映射建议"):
@@ -182,7 +215,7 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
             confirmed = await client.post(
                 f"{api}/dataset-imports/{job_id}/confirm-mapping", json={"items": items}, headers=headers
             )
-            if not report.expect(confirmed, 200, "确认映射并冻结数据版本"):
+            if not report.expect(confirmed, 200, "冻结真实数据版本（BUNDLE）"):
                 return 1
             dataset_version_id = confirmed.json()["id"]
 

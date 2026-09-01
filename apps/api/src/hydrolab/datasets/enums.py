@@ -32,6 +32,10 @@ class DataFormat(StrEnum):
     CSV = "CSV"
     PARQUET = "PARQUET"
     NETCDF = "NETCDF"
+    XLSX = "XLSX"
+    # BUNDLE：一个 zip 内含多文件/子目录的完整数据包（水文场景常见：
+    # 多流域时序表 + 静态属性 + 子目录），物化时按原始相对路径展开。
+    BUNDLE = "BUNDLE"
     DIRECTORY = "DIRECTORY"
     UNKNOWN = "UNKNOWN"
 

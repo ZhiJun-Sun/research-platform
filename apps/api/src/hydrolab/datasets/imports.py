@@ -2,6 +2,7 @@
 
 import csv
 import io
+from pathlib import Path
 from uuid import UUID
 
 from hydrolab.access.policy import AccessPolicy
@@ -91,6 +92,9 @@ class ImportService:
             "parquet": DataFormat.PARQUET,
             "nc": DataFormat.NETCDF,
             "netcdf": DataFormat.NETCDF,
+            "xlsx": DataFormat.XLSX,
+            "xls": DataFormat.XLSX,
+            "zip": DataFormat.BUNDLE,
         }
         key = f"imports/{job.id}/{filename}"
         # S3-01 后替换为预签名直传 + complete。
@@ -121,7 +125,10 @@ class ImportService:
         job = await self._get_owner_job(owner, job_id)
         if job.status != ImportJobStatus.MAPPING_REQUIRED:
             raise conflict("当前导入不等待字段映射确认", {"status": job.status.value})
-        self._validate_mapping(items)
+        # BUNDLE 内含多张表与静态属性，没有统一表头，故不做字段映射校验；
+        # 其语义由训练代码按自身约定解释，平台只保证内容不可变与可物化。
+        if job.detected_format != DataFormat.BUNDLE:
+            self._validate_mapping(items)
         mapping = await self._mappings.get_by_job(job.id)
         if mapping is None:
             raise not_found("字段映射不存在")
@@ -141,6 +148,8 @@ class ImportService:
                 "format": job.detected_format.value,
                 "artifact_id": str(artifact.id),
                 "field_mapping": [item.model_dump(mode="json") for item in items],
+                # 物化所需：整包内的文件清单（非 BUNDLE 时为单文件）
+                "entries": job.bundle_entries,
             },
             content_hash=artifact.sha256,
             frozen_at=utcnow(),
@@ -202,6 +211,28 @@ class ImportService:
                 job.error_code = "UNSUPPORTED_ENCODING"
                 await self._jobs.update(job)
                 return
+        elif job.detected_format == DataFormat.XLSX:
+            columns = self._probe_xlsx_columns(content)
+            if not columns:
+                job.status = ImportJobStatus.FAILED
+                job.error_code = "UNREADABLE_XLSX"
+                await self._jobs.update(job)
+                return
+        elif job.detected_format == DataFormat.BUNDLE:
+            # 整包不做字段映射：内部可能有多张表与静态属性，语义各不相同。
+            # 这里只清点内容，映射留给使用方在训练脚本内按自身约定读取。
+            entries, error = self._probe_bundle(content)
+            if error is not None:
+                job.status = ImportJobStatus.FAILED
+                job.error_code = error
+                await self._jobs.update(job)
+                return
+            job.bundle_entries = entries
+            await self._mappings.add(FieldMapping(import_job_id=job.id, items=[]))
+            job.status = ImportJobStatus.MAPPING_REQUIRED
+            job.progress = 80
+            await self._jobs.update(job)
+            return
         items = []
         for index, name in enumerate(columns):
             semantic = self._semantic(name)
@@ -218,6 +249,60 @@ class ImportService:
         job.status = ImportJobStatus.MAPPING_REQUIRED
         job.progress = 80
         await self._jobs.update(job)
+
+    @staticmethod
+    def _probe_xlsx_columns(content: bytes) -> list[str]:
+        """读取 xlsx 首个工作表的表头。
+
+        openpyxl 为可选依赖：缺失时不阻断导入，返回空表头由调用方判为失败，
+        避免因未安装可选库而让整个数据域不可用。
+        """
+        try:
+            from openpyxl import load_workbook
+        except ImportError:
+            return []
+        try:
+            workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        except Exception:
+            return []
+        try:
+            sheet = workbook[workbook.sheetnames[0]]
+            header = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), ())
+            return [str(cell) for cell in header if cell is not None]
+        except Exception:
+            return []
+        finally:
+            workbook.close()
+
+    @staticmethod
+    def _probe_bundle(content: bytes) -> tuple[list[str], str | None]:
+        """清点 zip 数据包内容，同时拒绝路径穿越与压缩炸弹。
+
+        与代码导入一致地做安全检查：数据包同样会被物化到 Runner 工作目录，
+        因此绝对路径、`..` 与超大解压比都必须在入库前拦下。
+        """
+        import zipfile
+
+        max_uncompressed = 8 * 1024**3  # 8 GiB 上限，防解压炸弹
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                total = 0
+                entries: list[str] = []
+                for info in archive.infolist():
+                    if info.is_dir():
+                        continue
+                    name = info.filename
+                    if name.startswith("/") or ".." in Path(name).parts:
+                        return [], "UNSAFE_ARCHIVE_PATH"
+                    total += info.file_size
+                    if total > max_uncompressed:
+                        return [], "ARCHIVE_TOO_LARGE"
+                    entries.append(name)
+                if not entries:
+                    return [], "EMPTY_ARCHIVE"
+                return sorted(entries), None
+        except zipfile.BadZipFile:
+            return [], "INVALID_ARCHIVE"
 
     @staticmethod
     def _semantic(name: str) -> FieldSemantic:

@@ -99,8 +99,21 @@ class SubprocessRunExecutor:
     def workspace_for(self, run_id: UUID) -> Path:
         return self._workspace_root / str(run_id)
 
-    def prepare_workspace(self, run_id: UUID, archive: bytes | None) -> Path:
-        """建立 <workspace>/<run_id>/{code,output} 并物化代码与只读数据。"""
+    def prepare_workspace(
+        self,
+        run_id: UUID,
+        archive: bytes | None,
+        dataset_files: dict[str, bytes] | None = None,
+    ) -> Path:
+        """建立 <workspace>/<run_id>/{code,output} 并物化代码与数据。
+
+        数据来源有两条互斥路径，前者优先：
+        1. dataset_files —— 由冻结 DatasetVersion 取回的内容，逐文件写入
+           code/datasets/，保留包内原始相对路径。这是可复现的正道：
+           跑哪个数据版本完全由 Run 自身决定。
+        2. self._data_root —— 全局只读目录软链接，仅作为未选定数据版本时的
+           兼容兜底（早期联调遗留），不参与版本追溯。
+        """
 
         workspace = self.workspace_for(run_id)
         code_dir = workspace / "code"
@@ -109,8 +122,11 @@ class SubprocessRunExecutor:
         output_dir.mkdir(parents=True, exist_ok=True)
         if archive:
             extract_archive(archive, code_dir)
-        # 只读数据：以符号链接暴露为 code/datasets，让原有相对路径 "datasets/xxx" 生效
-        if self._data_root and self._data_root.is_dir():
+        if dataset_files:
+            self._materialize_datasets(code_dir, dataset_files)
+        elif self._data_root and self._data_root.is_dir():
+            # 未选定数据版本时的兼容路径：以符号链接暴露为 code/datasets，
+            # 让原有相对路径 "datasets/xxx" 仍然生效。
             link = code_dir / "datasets"
             if not link.exists():
                 try:
@@ -118,6 +134,27 @@ class SubprocessRunExecutor:
                 except OSError:
                     pass
         return workspace
+
+    @staticmethod
+    def _materialize_datasets(code_dir: Path, dataset_files: dict[str, bytes]) -> None:
+        """把数据集内容写入 code/datasets/，逐条防御路径穿越。
+
+        若代码包里已存在 datasets 软链接（兼容路径残留），必须先摘除，
+        否则写入会穿透到全局只读目录，既污染共享数据又破坏可复现性。
+        """
+        target_root = code_dir / "datasets"
+        if target_root.is_symlink():
+            target_root.unlink()
+        target_root.mkdir(parents=True, exist_ok=True)
+        resolved_root = target_root.resolve()
+        for relative_path, payload in dataset_files.items():
+            candidate = (target_root / relative_path).resolve()
+            if resolved_root != candidate and resolved_root not in candidate.parents:
+                raise validation_error(
+                    "数据集文件路径越界", {"path": relative_path}
+                )
+            candidate.parent.mkdir(parents=True, exist_ok=True)
+            candidate.write_bytes(payload)
 
     # ---------- RunExecutor 端口 ----------
     async def start(self, spec: RunSpec) -> RunHandle:
