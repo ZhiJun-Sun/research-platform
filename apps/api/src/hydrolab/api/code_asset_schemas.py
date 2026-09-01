@@ -24,6 +24,30 @@ class GitImport(BaseModel):
     commit_sha: str | None = None
 
 
+class DirectoryImport(BaseModel):
+    """本地目录快照导入请求。path 必须位于允许的根目录内。"""
+
+    path: str
+    extra_ignore: list[str] = Field(default_factory=list)
+
+
+class DirectoryPreviewView(BaseModel):
+    source_path: str
+    content_hash: str
+    file_count: int
+    uncompressed_bytes: int
+    archive_bytes: int
+    files: list[str]
+    detected_manifests: list[str]
+    entrypoints: list[str]
+    skipped_sample: list[str]
+
+
+class DirectoryImportView(BaseModel):
+    code_version: "CodeVersionView"
+    preview: DirectoryPreviewView
+
+
 class CodeRepositoryView(BaseModel):
     id: UUID
     name: str
@@ -106,3 +130,7 @@ class PresetView(BaseModel):
     template_version_id: UUID
     name: str
     values: dict[str, Any]
+
+
+# CodeVersionView 在 DirectoryImportView 之后定义，需显式重建前向引用
+DirectoryImportView.model_rebuild()

@@ -9,6 +9,9 @@ from hydrolab.api.code_asset_schemas import (
     CodeRepositoryView,
     CodeVersionView,
     CodeZipImport,
+    DirectoryImport,
+    DirectoryImportView,
+    DirectoryPreviewView,
     EnvironmentVersionCreate,
     EnvironmentVersionView,
     EnvironmentView,
@@ -123,6 +126,54 @@ async def register_git(
 ) -> CodeVersionView:
     return _code_version_view(
         await request.app.state.code_import_service.register_git(user, repository_id, body.source_ref, body.commit_sha)
+    )
+
+
+def _preview_view(source_path: str, snapshot: object) -> DirectoryPreviewView:
+    return DirectoryPreviewView(
+        source_path=source_path,
+        content_hash=snapshot.content_hash,  # type: ignore[attr-defined]
+        file_count=len(snapshot.files),  # type: ignore[attr-defined]
+        uncompressed_bytes=snapshot.total_bytes,  # type: ignore[attr-defined]
+        archive_bytes=len(snapshot.archive),  # type: ignore[attr-defined]
+        files=snapshot.files[:200],  # type: ignore[attr-defined]
+        detected_manifests=snapshot.detected_manifests,  # type: ignore[attr-defined]
+        entrypoints=snapshot.entrypoints,  # type: ignore[attr-defined]
+        skipped_sample=snapshot.skipped[:50],  # type: ignore[attr-defined]
+    )
+
+
+@router.get("/code-import-roots", response_model=list[str])
+async def list_import_roots(request: Request, user: User = Depends(get_current_user)) -> list[str]:
+    """可导入的主机根目录白名单（前端用于提示合法路径）。"""
+    return request.app.state.directory_import_service.allowed_roots
+
+
+@router.post("/code-import-previews", response_model=DirectoryPreviewView)
+async def preview_directory(
+    body: DirectoryImport, request: Request, user: User = Depends(get_current_user)
+) -> DirectoryPreviewView:
+    """只读预览目录快照：不写对象存储，不创建 CodeVersion。"""
+    import asyncio
+
+    service = request.app.state.directory_import_service
+    resolved, snapshot = await asyncio.to_thread(service.preview, body.path, body.extra_ignore)
+    return _preview_view(str(resolved), snapshot)
+
+
+@router.post(
+    "/code-repositories/{repository_id}/directory-imports", response_model=DirectoryImportView, status_code=201
+)
+async def import_directory(
+    repository_id: UUID, body: DirectoryImport, request: Request, user: User = Depends(get_current_user)
+) -> DirectoryImportView:
+    """把主机上的真实工程目录固化为不可变 CodeVersion（只读取，不执行）。"""
+    version, snapshot = await request.app.state.directory_import_service.import_directory(
+        user, repository_id, body.path, body.extra_ignore
+    )
+    source_path = str(snapshot and version.manifest.get("source_path", body.path))
+    return DirectoryImportView(
+        code_version=_code_version_view(version), preview=_preview_view(source_path, snapshot)
     )
 
 

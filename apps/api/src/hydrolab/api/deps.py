@@ -14,6 +14,7 @@ from hydrolab.adapters.fake import (
     NoopExperimentTracker,
 )
 from hydrolab.adapters.local import LocalFilesystemObjectStorage
+from hydrolab.adapters.local.run_executor import SubprocessRunExecutor
 from hydrolab.core.errors import dependency_unavailable
 from hydrolab.core.settings import Settings, get_settings
 from hydrolab.ports import ExperimentTracker, ObjectStorage, RunExecutor, TaskQueue
@@ -58,4 +59,12 @@ def get_run_executor() -> RunExecutor:
     settings = get_settings()
     if settings.run_executor_backend == "fake":
         return FakeRunExecutor()
+    if settings.run_executor_backend == "subprocess":
+        # 本机真实执行：无容器隔离，仅允许非生产环境（validate_production 已拦截）。
+        return SubprocessRunExecutor(
+            workspace_root=settings.runner_workspace_root,
+            python_executable=settings.runner_python_executable,
+            data_root=settings.runner_data_root,
+            default_timeout_seconds=settings.runner_default_timeout_seconds,
+        )
     raise _pending("DockerGpuRunExecutor", "Runner 安全 Spike")

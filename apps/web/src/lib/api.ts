@@ -22,6 +22,14 @@ export type ApiMappingItem = { source_name: string; standard_name: string | null
 export type ApiFieldMapping = { id: string; import_job_id: string; items: ApiMappingItem[]; created_at: string; confirmed_at: string | null }
 export type ApiDatasetVersion = { id: string; version_no: number; status: string; content_hash: string | null; manifest: Record<string, unknown> }
 
+export type ApiDirectoryPreview = { source_path: string; content_hash: string; file_count: number; uncompressed_bytes: number; archive_bytes: number; files: string[]; detected_manifests: string[]; entrypoints: string[]; skipped_sample: string[] }
+export type ApiDirectoryImport = { code_version: ApiCodeVersion; preview: ApiDirectoryPreview }
+export type ApiRunLog = { id: number; run_id: string; content: string; stream: string; created_at: string }
+export type ApiCollectedMetric = { name: string; value: number; split: string; horizon: number | null }
+export type ApiCollectedArtifact = { kind: string; relative_path: string; object_key: string; sha256: string; size_bytes: number }
+export type ApiRunCollection = { collected: boolean; experiment_dirs?: string[]; metrics: ApiCollectedMetric[]; artifacts: ApiCollectedArtifact[]; warnings: string[] }
+export type ApiRunIngest = { result: ApiResult; metrics_added: number; artifacts_added: number; experiment_dirs?: string[]; warnings: string[] }
+
 export type ApiUser = { id: string; email: string; display_name: string; is_admin: boolean; status: string }
 type LoginResponse = { tokens: { access_token: string; refresh_token: string }; user: ApiUser }
 type Workspace = { user_name: string; runs: ApiRun[]; gpu_count: number; queued_count: number }
@@ -110,6 +118,15 @@ export const listCodeRepositories = () => authed<ApiCodeRepository[]>('/code-rep
 export const listCodeVersions = (repositoryId: string) => authed<ApiCodeVersion[]>(`/code-repositories/${repositoryId}/versions`)
 export const importCodeZip = (repositoryId: string, filename: string, contentBase64: string) => authed<ApiCodeVersion>(`/code-repositories/${repositoryId}/zip-imports`, { method: 'POST', body: JSON.stringify({ filename, content_base64: contentBase64 }) })
 export const importCodeGit = (repositoryId: string, sourceRef: string, commitSha: string) => authed<ApiCodeVersion>(`/code-repositories/${repositoryId}/git-imports`, { method: 'POST', body: JSON.stringify({ source_ref: sourceRef, commit_sha: commitSha || null }) })
+export const listCodeImportRoots = () => authed<string[]>('/code-import-roots')
+export const previewDirectoryImport = (path: string) => authed<ApiDirectoryPreview>('/code-import-previews', { method: 'POST', body: JSON.stringify({ path, extra_ignore: [] }) })
+export const importCodeDirectory = (repositoryId: string, path: string) => authed<ApiDirectoryImport>(`/code-repositories/${repositoryId}/directory-imports`, { method: 'POST', body: JSON.stringify({ path, extra_ignore: [] }) })
+export const startRun = (runId: string, gpuCount = 1) => authed<{ id: string; status: string }>(`/runs/${runId}/start`, { method: 'POST', body: JSON.stringify({ gpu_count: gpuCount }) })
+export const awaitRun = (runId: string, timeoutSeconds = 1800) => authed<{ id: string; status: string }>(`/runs/${runId}/await`, { method: 'POST', body: JSON.stringify({ timeout_seconds: timeoutSeconds }) })
+export const getRunLogs = (runId: string, afterId = 0) => authed<ApiRunLog[]>(`/runs/${runId}/logs?after_id=${afterId}`)
+export const getRunCollection = (runId: string) => authed<ApiRunCollection>(`/runs/${runId}/collection`)
+export const ingestRunResult = (runId: string) => authed<ApiRunIngest>(`/runs/${runId}/result/ingest`, { method: 'POST' })
+export const dispatchOutbox = () => authed<{ dispatched: number }>('/internal/outbox/dispatch', { method: 'POST' })
 export const createDataset = (name: string, description: string) => authed<ApiCatalogItem>('/datasets', { method: 'POST', body: JSON.stringify({ name, description }) })
 export const createDatasetImport = (datasetId: string) => authed<ApiDatasetImport>('/dataset-imports', { method: 'POST', body: JSON.stringify({ dataset_id: datasetId, source_type: 'UPLOAD' }), headers: { 'Idempotency-Key': crypto.randomUUID() } })
 export const fakeUploadDataset = (jobId: string, filename: string, content: string) => authed<ApiDatasetImport>(`/dataset-imports/${jobId}/fake-upload`, { method: 'POST', body: JSON.stringify({ filename, content }) })

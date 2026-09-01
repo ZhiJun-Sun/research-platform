@@ -52,6 +52,44 @@ async def create_result(run_id: UUID, request: Request, user: User = Depends(get
     return await request.app.state.result_service.create_result(user, run_id)
 
 
+@router.post("/runs/{run_id}/result/ingest", status_code=201)
+async def ingest_result(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> object:
+    """把真实执行采集到的产物一次性登记为 Result + Metrics + Artifacts。
+
+    这是 e2e 链路的收口：Runner 采集 → 结果域，前端随后可直接绘图/对比/导出。
+    """
+    result_service = request.app.state.result_service
+    report = request.app.state.run_control_service.collection_report(run_id)
+    result = await result_service.create_result(user, run_id)
+    if report is None:
+        return {"result": result, "metrics_added": 0, "artifacts_added": 0, "warnings": ["没有采集报告"]}
+
+    metrics_added = 0
+    if report.metrics:
+        points = [
+            MetricPoint(result_id=result.id, name=item.name, value=item.value, split=item.split)
+            for item in report.metrics
+        ]
+        metrics_added = len(await result_service.add_metrics(user, result.id, points))
+
+    artifacts_added = 0
+    for item in report.artifacts + report.configs + report.checkpoints:
+        await result_service.add_artifact(
+            user,
+            result.id,
+            ResultArtifact(result_id=result.id, kind=item.kind, object_key=item.object_key, sha256=item.sha256),
+        )
+        artifacts_added += 1
+
+    return {
+        "result": result,
+        "metrics_added": metrics_added,
+        "artifacts_added": artifacts_added,
+        "experiment_dirs": report.experiment_dirs,
+        "warnings": report.warnings[:20],
+    }
+
+
 @router.post("/results/{result_id}/metrics", status_code=201)
 async def add_metrics(
     result_id: UUID, body: list[MetricInput], request: Request, user: User = Depends(get_current_user)

@@ -9,6 +9,7 @@ __pycache__/
 
 # HydroLab 本地数据与密钥
 .hydrolab-data/
+.hydrolab-e2e/
 .env
 
 # Node / 前端

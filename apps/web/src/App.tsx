@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getRealSection, getStoredUser, getWorkspace, importCodeGit, importCodeZip, listCheckpoints, listCodeRepositories, listCodeVersions, listDrafts, listMetrics, listResults, listTemplateVersions, listTemplates, login, logout, seedDemo, submitDraft, updateDraft } from './lib/api'
-import type { ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiMappingItem, ApiRun, ApiUser } from './lib/api'
+import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getRealSection, getStoredUser, getWorkspace, importCodeDirectory, importCodeGit, importCodeZip, listCodeImportRoots, listCheckpoints, listCodeRepositories, listCodeVersions, listDrafts, listMetrics, listResults, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, seedDemo, submitDraft, updateDraft } from './lib/api'
+import type { ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiDirectoryPreview, ApiMappingItem, ApiRun, ApiUser } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -435,10 +435,14 @@ function CodeRepositoryPanel() {
   const [versions, setVersions] = useState<Record<string, ApiCodeVersion[]>>({})
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [source, setSource] = useState<'zip' | 'git'>('zip')
+  const [source, setSource] = useState<'zip' | 'git' | 'dir'>('zip')
   const [file, setFile] = useState<File | null>(null)
   const [gitUrl, setGitUrl] = useState('')
   const [commit, setCommit] = useState('')
+  const [dirPath, setDirPath] = useState('')
+  const [importRoots, setImportRoots] = useState<string[]>([])
+  const [preview, setPreview] = useState<ApiDirectoryPreview | null>(null)
+  const [previewing, setPreviewing] = useState(false)
   const [entrypoints, setEntrypoints] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -446,6 +450,8 @@ function CodeRepositoryPanel() {
   const load = async () => {
     try {
       await ensureDevSession(); await seedDemo()
+      // 目录导入白名单由后端配置决定；为空表示该能力未开放。
+      try { setImportRoots(await listCodeImportRoots()) } catch { setImportRoots([]) }
       const repos = await listCodeRepositories()
       setRepositories(repos)
       const loaded = await Promise.all(repos.map(async repo => [repo.id, await listCodeVersions(repo.id)] as const))
@@ -471,26 +477,43 @@ function CodeRepositoryPanel() {
       setMessage(`已创建可执行模板「${template.name}」v${created.version_no}。现在可在“实验”页选择它创建训练 Run。`)
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '创建执行模板失败') } finally { setSubmitting(false) }
   }
+  const runPreview = async () => {
+    if (!dirPath.trim()) { setError('请填写服务器上的目录绝对路径'); return }
+    setPreviewing(true); setError(null); setMessage(null); setPreview(null)
+    try {
+      await ensureDevSession()
+      const result = await previewDirectoryImport(dirPath.trim())
+      setPreview(result)
+      setMessage(`预览成功：${result.file_count} 个代码文件，内容哈希 ${result.content_hash.slice(0, 12)}。虚拟环境、缓存、数据与既有产物已自动排除。`)
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '目录预览失败') } finally { setPreviewing(false) }
+  }
   const submit = async () => {
     if (!name.trim()) { setError('请填写代码仓库名称'); return }
     if (source === 'zip' && !file) { setError('请选择 ZIP 代码归档'); return }
     if (source === 'git' && !gitUrl.trim()) { setError('请填写无凭证的 HTTPS Git 地址'); return }
+    if (source === 'dir' && !dirPath.trim()) { setError('请填写服务器上的目录绝对路径'); return }
     if (file && file.size > 10_000_000) { setError('当前本地联调 ZIP 不超过 10 MB；生产环境应使用对象存储直传。'); return }
     setSubmitting(true); setError(null); setMessage(null)
     try {
       await ensureDevSession()
       const repo = await createCodeRepository(name.trim(), description.trim())
-      const version = source === 'zip'
-        ? await importCodeZip(repo.id, file!.name, await toBase64(file!))
-        : await importCodeGit(repo.id, gitUrl.trim(), commit.trim())
-      setMessage(source === 'zip'
-        ? `已导入代码「${repo.name}」v${version.version_no}，状态 ${version.status}；可在实验中选择该不可变版本。`
-        : `已登记 Git 代码「${repo.name}」v${version.version_no}，状态 ${version.status}；等待 Worker 拉取并冻结 Commit。`)
+      if (source === 'dir') {
+        const imported = await importCodeDirectory(repo.id, dirPath.trim())
+        setMessage(`已把目录 ${imported.preview.source_path} 固化为代码「${repo.name}」v${imported.code_version.version_no}，共 ${imported.preview.file_count} 个文件，哈希 ${imported.preview.content_hash.slice(0, 12)}；入口候选：${imported.preview.entrypoints.slice(0, 5).join('、') || '未识别'}。`)
+        setPreview(null); setDirPath('')
+      } else {
+        const version = source === 'zip'
+          ? await importCodeZip(repo.id, file!.name, await toBase64(file!))
+          : await importCodeGit(repo.id, gitUrl.trim(), commit.trim())
+        setMessage(source === 'zip'
+          ? `已导入代码「${repo.name}」v${version.version_no}，状态 ${version.status}；可在实验中选择该不可变版本。`
+          : `已登记 Git 代码「${repo.name}」v${version.version_no}，状态 ${version.status}；等待 Worker 拉取并冻结 Commit。`)
+      }
       setName(''); setDescription(''); setFile(null); setGitUrl(''); setCommit('')
       await load()
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : '代码导入失败') } finally { setSubmitting(false) }
   }
-  return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">MODEL CODE</p><h1>模型代码 / 模板</h1><p>每位用户仅看到自己拥有或被授权的代码仓库、不可变版本与可执行模板。</p></div><button className="button secondary" onClick={() => void load()}><RefreshCw size={15}/>刷新</button></header><section className="code-import-panel"><div className="dataset-import-heading"><div><p className="eyebrow">IMPORT CODE</p><h2>导入模型代码</h2><p>ZIP 会安全检查并冻结到对象存储；Git 仅登记 HTTPS 来源，等待 Worker 拉取固定 Commit。</p></div></div><div className="source-toggle"><button className={source === 'zip' ? 'active' : ''} onClick={() => setSource('zip')}>本地 ZIP</button><button className={source === 'git' ? 'active' : ''} onClick={() => setSource('git')}>Git HTTPS</button></div><div className="dataset-import-fields"><label>代码仓库名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：KG-MoE-MS 北江实验" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：2024 训练脚本与配置" /></label></div>{source === 'zip' ? <label className="dataset-drop-zone"><FileUp size={26}/><div><b>{file ? file.name : '选择包含训练入口的 ZIP 归档'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 将检查文件清单并创建不可变版本` : '不执行 ZIP 内代码；拒绝路径穿越、符号链接和压缩炸弹'}</span></div><input className="visually-hidden" type="file" accept=".zip,application/zip" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label> : <div className="dataset-import-fields"><label>Git HTTPS 地址 <em>必填</em><input value={gitUrl} onChange={event => setGitUrl(event.target.value)} placeholder="https://github.com/org/repository.git" /></label><label>固定 Commit <span>建议填写</span><input value={commit} onChange={event => setCommit(event.target.value)} placeholder="例如：a1b2c3d4" /></label></div>}<div className="dataset-import-footer"><p>导入后，实验 Runner 会把选中的不可变版本物化到受控工作目录，再按模板 argv 执行；不会直接执行任意宿主机路径。</p><button className="button primary" onClick={() => void submit()} disabled={submitting}><FileCode2 size={15}/>{submitting ? '正在导入…' : '导入代码版本'}</button></div>{message && <p className="onboarding"><b>{message}</b></p>}{error && <p className="error-notice">代码导入错误：{error}</p>}</section><section className="section-block"><div className="section-heading"><div><h2>我的代码仓库</h2><p>{repositories.length} 个可访问仓库 · 每个版本均可追溯来源、内容摘要与执行入口。</p></div></div><div className="code-repository-list">{repositories.map(repo => <article key={repo.id}><header><div><FileCode2 size={18}/><span><b>{repo.name}</b><small>{repo.description || '未填写说明'}</small></span></div><code>{repo.id.slice(0, 8)}</code></header>{(versions[repo.id] ?? []).map(version => <div className="code-version-row" key={version.id}><div><b>v{version.version_no} · {version.source_type}</b><small>{version.status === 'READY' ? `存储键：${version.object_key ?? '—'}` : `来源：${version.source_ref ?? '—'}${version.commit_sha ? ` @ ${version.commit_sha}` : ''}`}</small></div><div><code>{version.content_hash?.slice(0, 12) ?? '等待拉取'}</code><span>{version.manifest.file_count ?? 0} 个文件 · {(version.manifest.detected_manifests ?? []).join('、') || '未识别依赖清单'}</span></div><details><summary>查看文件与执行说明</summary><p>Runner 工作目录：<code>/workspace/code</code>（运行时受控物化，不是宿主机固定路径）</p><p>文件：{(version.manifest.files ?? []).slice(0, 12).join('、') || 'Git 拉取后生成'}</p>{version.status === 'READY' && <div className="template-entrypoint"><label>训练入口 argv<input value={entrypoints[version.id] ?? 'python train.py'} onChange={event => setEntrypoints(current => ({ ...current, [version.id]: event.target.value }))} placeholder="python train.py" /></label><button className="button secondary" onClick={() => void createExecutable(repo, version)} disabled={submitting}>创建可执行模板</button></div>}</details></div>)}{!(versions[repo.id] ?? []).length && <p className="quiet">尚未导入版本。</p>}</article>)}{!repositories.length && <p className="quiet">还没有代码仓库。请先导入 ZIP 或登记 Git HTTPS 地址。</p>}</div></section></div>
+  return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">MODEL CODE</p><h1>模型代码 / 模板</h1><p>每位用户仅看到自己拥有或被授权的代码仓库、不可变版本与可执行模板。</p></div><button className="button secondary" onClick={() => void load()}><RefreshCw size={15}/>刷新</button></header><section className="code-import-panel"><div className="dataset-import-heading"><div><p className="eyebrow">IMPORT CODE</p><h2>导入模型代码</h2><p>ZIP 会安全检查并冻结到对象存储；Git 仅登记 HTTPS 来源，等待 Worker 拉取固定 Commit。</p></div></div><div className="source-toggle"><button className={source === 'zip' ? 'active' : ''} onClick={() => setSource('zip')}>本地 ZIP</button><button className={source === 'git' ? 'active' : ''} onClick={() => setSource('git')}>Git HTTPS</button><button className={source === 'dir' ? 'active' : ''} onClick={() => setSource('dir')}>服务器目录</button></div><div className="dataset-import-fields"><label>代码仓库名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：KG-MoE-MS 北江实验" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：2024 训练脚本与配置" /></label></div>{source === 'zip' ? <label className="dataset-drop-zone"><FileUp size={26}/><div><b>{file ? file.name : '选择包含训练入口的 ZIP 归档'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 将检查文件清单并创建不可变版本` : '不执行 ZIP 内代码；拒绝路径穿越、符号链接和压缩炸弹'}</span></div><input className="visually-hidden" type="file" accept=".zip,application/zip" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label> : <div className="dataset-import-fields"><label>Git HTTPS 地址 <em>必填</em><input value={gitUrl} onChange={event => setGitUrl(event.target.value)} placeholder="https://github.com/org/repository.git" /></label><label>固定 Commit <span>建议填写</span><input value={commit} onChange={event => setCommit(event.target.value)} placeholder="例如：a1b2c3d4" /></label></div>}{source === 'dir' && <div className="directory-import"><div className="dataset-import-fields"><label>服务器目录绝对路径 <em>必填</em><input value={dirPath} onChange={event => setDirPath(event.target.value)} placeholder={importRoots[0] ? `${importRoots[0]}/my-project` : '/srv/projects/my-project'} /></label></div><p className="quiet">允许导入的根目录：{importRoots.length ? importRoots.join('、') : '管理员尚未配置 HYDROLAB_CODE_IMPORT_ROOTS，目录导入不可用'}</p><button className="button secondary" onClick={() => void runPreview()} disabled={previewing || !importRoots.length}><Search size={15}/>{previewing ? '正在扫描…' : '预览目录快照'}</button>{preview && <div className="directory-preview"><div className="metadata-grid"><div><span>代码文件</span><b>{preview.file_count} 个</b></div><div><span>解压体积</span><b>{(preview.uncompressed_bytes / 1024).toFixed(0)} KB</b></div><div><span>归档体积</span><b>{(preview.archive_bytes / 1024).toFixed(0)} KB</b></div><div><span>内容哈希</span><b className="mono">{preview.content_hash.slice(0, 12)}</b></div></div><p>入口候选：{preview.entrypoints.slice(0, 6).join('、') || '未识别到根目录 Python 入口'}</p><p>依赖清单：{preview.detected_manifests.join('、') || '未识别'}</p><details><summary>查看前 20 个文件</summary><p className="mono">{preview.files.slice(0, 20).join('、')}</p></details></div>}</div>}<div className="dataset-import-footer"><p>导入后，实验 Runner 会把选中的不可变版本物化到受控工作目录，再按模板 argv 执行；不会直接执行任意宿主机路径。</p><button className="button primary" onClick={() => void submit()} disabled={submitting}><FileCode2 size={15}/>{submitting ? '正在导入…' : '导入代码版本'}</button></div>{message && <p className="onboarding"><b>{message}</b></p>}{error && <p className="error-notice">代码导入错误：{error}</p>}</section><section className="section-block"><div className="section-heading"><div><h2>我的代码仓库</h2><p>{repositories.length} 个可访问仓库 · 每个版本均可追溯来源、内容摘要与执行入口。</p></div></div><div className="code-repository-list">{repositories.map(repo => <article key={repo.id}><header><div><FileCode2 size={18}/><span><b>{repo.name}</b><small>{repo.description || '未填写说明'}</small></span></div><code>{repo.id.slice(0, 8)}</code></header>{(versions[repo.id] ?? []).map(version => <div className="code-version-row" key={version.id}><div><b>v{version.version_no} · {version.source_type}</b><small>{version.status === 'READY' ? `存储键：${version.object_key ?? '—'}` : `来源：${version.source_ref ?? '—'}${version.commit_sha ? ` @ ${version.commit_sha}` : ''}`}</small></div><div><code>{version.content_hash?.slice(0, 12) ?? '等待拉取'}</code><span>{version.manifest.file_count ?? 0} 个文件 · {(version.manifest.detected_manifests ?? []).join('、') || '未识别依赖清单'}</span></div><details><summary>查看文件与执行说明</summary><p>Runner 工作目录：<code>/workspace/code</code>（运行时受控物化，不是宿主机固定路径）</p><p>文件：{(version.manifest.files ?? []).slice(0, 12).join('、') || 'Git 拉取后生成'}</p>{version.status === 'READY' && <div className="template-entrypoint"><label>训练入口 argv<input value={entrypoints[version.id] ?? 'python train.py'} onChange={event => setEntrypoints(current => ({ ...current, [version.id]: event.target.value }))} placeholder="python train.py" /></label><button className="button secondary" onClick={() => void createExecutable(repo, version)} disabled={submitting}>创建可执行模板</button></div>}</details></div>)}{!(versions[repo.id] ?? []).length && <p className="quiet">尚未导入版本。</p>}</article>)}{!repositories.length && <p className="quiet">还没有代码仓库。请先导入 ZIP 或登记 Git HTTPS 地址。</p>}</div></section></div>
 }
 
 function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' | 'environments' }) {

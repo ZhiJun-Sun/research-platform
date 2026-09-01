@@ -13,12 +13,13 @@ from hydrolab import __version__
 from hydrolab.adapters.fake.run_executor import FakeRunExecutor
 from hydrolab.adapters.fake.task_queue import FakeTaskQueue
 from hydrolab.api.container import build_repositories, build_services
-from hydrolab.api.deps import get_object_storage
+from hydrolab.api.deps import get_object_storage, get_run_executor
 from hydrolab.api.routes import api_v1_router
 from hydrolab.api.routes.dev_demo import router as dev_demo_router
 from hydrolab.api.routes.health import router as health_router
 from hydrolab.checkpoints.memory import InMemoryCheckpoints
 from hydrolab.checkpoints.service import CheckpointService
+from hydrolab.code_assets.directory_import import DirectoryImportService
 from hydrolab.code_assets.imports import CodeImportService
 from hydrolab.code_assets.memory import (
     InMemoryCodeRepositories,
@@ -45,6 +46,7 @@ from hydrolab.datasets.memory import (
     InMemoryFolderRepository,
     InMemoryImportJobRepository,
 )
+from hydrolab.execution.collector import ArtifactCollector
 from hydrolab.execution.memory import (
     InMemoryExecutions,
     InMemoryGpuLeases,
@@ -119,6 +121,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         storage,
         services.policy,
     )
+    # 本地目录快照导入：把服务器上的真实工程目录固化为不可变 CodeVersion。
+    app.state.directory_import_service = DirectoryImportService(
+        app.state.code_versions,
+        storage,
+        services.policy,
+        settings.code_import_roots,
+    )
     app.state.template_environment_service = TemplateEnvironmentService(
         app.state.code_versions,
         app.state.templates,
@@ -172,12 +181,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.checkpoints, app.state.runs, app.state.experiment_versions
     )
 
-    # B5/B6：Fake 控制与观测面。真实 Celery/Docker/Redis/MLflow 后续替换 Adapter。
+    # B5/B6：执行控制与观测。fake 后端只推进状态机；subprocess 后端真实执行并采集产物。
     app.state.gpu_leases = InMemoryGpuLeases(gpu_count=2)
     app.state.executions = InMemoryExecutions()
     app.state.run_events = InMemoryRunEvents()
     app.state.run_logs = InMemoryLogs()
     app.state.resource_samples = InMemoryResourceSamples()
+
+    executor = get_run_executor()
+    # 真实执行器把每行 stdout 回流到 Run 日志，前端可增量拉取。
+    if hasattr(executor, "_log_sink"):
+        async def _sink(run_id: object, line: str) -> None:
+            await app.state.run_logs.append(run_id, line)
+
+        executor._log_sink = _sink  # type: ignore[attr-defined]
+
     app.state.run_control_service = RunControlService(
         app.state.runs,
         app.state.outbox,
@@ -187,7 +205,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.run_logs,
         app.state.resource_samples,
         FakeTaskQueue(),
-        FakeRunExecutor(),
+        executor,
+        versions=app.state.experiment_versions,
+        code_versions=app.state.code_versions,
+        template_versions=app.state.template_versions,
+        storage=storage,
+        collector=ArtifactCollector(storage),
     )
 
     # 首个管理员 bootstrap：仅系统无用户时执行一次

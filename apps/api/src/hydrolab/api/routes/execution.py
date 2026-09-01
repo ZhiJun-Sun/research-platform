@@ -60,7 +60,50 @@ async def cancel(run_id: UUID, request: Request, user: User = Depends(get_curren
 async def complete(
     run_id: UUID, body: CompleteRequest, request: Request, user: User = Depends(get_current_user)
 ) -> object:
-    return await request.app.state.run_control_service.complete_fake(run_id, body.exit_code)
+    service = request.app.state.run_control_service
+    # 真实执行器下走采集收尾；Fake 执行器保持原状态机语义。
+    if service.is_real_executor:
+        return await service.finalize(run_id, body.exit_code)
+    return await service.complete_fake(run_id, body.exit_code)
+
+
+class AwaitRequest(BaseModel):
+    timeout_seconds: float = Field(default=1800, gt=0, le=24 * 3600)
+
+
+@router.post("/runs/{run_id}/await")
+async def await_run(
+    run_id: UUID, body: AwaitRequest, request: Request, user: User = Depends(get_current_user)
+) -> object:
+    """阻塞等待真实执行结束并采集产物。Fake 后端直接返回当前 Run。"""
+    return await request.app.state.run_control_service.await_completion(run_id, body.timeout_seconds)
+
+
+@router.get("/runs/{run_id}/collection")
+async def collection(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> object:
+    """真实执行的产物采集报告（指标条数、artifact 清单、警告）。"""
+    report = request.app.state.run_control_service.collection_report(run_id)
+    if report is None:
+        return {"collected": False, "metrics": [], "artifacts": [], "warnings": []}
+    return {
+        "collected": True,
+        "experiment_dirs": report.experiment_dirs,
+        "metrics": [
+            {"name": item.name, "value": item.value, "split": item.split, "horizon": item.horizon}
+            for item in report.metrics
+        ],
+        "artifacts": [
+            {
+                "kind": item.kind,
+                "relative_path": item.relative_path,
+                "object_key": item.object_key,
+                "sha256": item.sha256,
+                "size_bytes": item.size_bytes,
+            }
+            for item in report.artifacts + report.configs + report.checkpoints
+        ],
+        "warnings": report.warnings,
+    }
 
 
 @router.post("/internal/runs/{run_id}/progress")

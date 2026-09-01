@@ -17,7 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ObjectStorageBackend = Literal["fake", "local", "s3"]
 TaskQueueBackend = Literal["fake", "celery"]
 ExperimentTrackerBackend = Literal["fake", "noop", "mlflow"]
-RunExecutorBackend = Literal["fake", "docker"]
+RunExecutorBackend = Literal["fake", "subprocess", "docker"]
 Environment = Literal["local", "test", "staging", "production"]
 
 
@@ -67,6 +67,19 @@ class Settings(BaseSettings):
     # --- local 后端根目录 ---
     local_storage_root: Path = Path(".hydrolab-data/objects")
 
+    # --- 本地目录代码导入白名单 ---
+    # 只有位于这些根目录之内的路径可被导入为 CodeVersion，防止任意主机路径外泄。
+    code_import_roots: list[Path] = []
+
+    # --- subprocess Runner（本机真实执行，无 Docker/GPU 时的可用实现） ---
+    # 运行工作区根目录：每个 Run 在其下获得独立目录（code/ output/）。
+    runner_workspace_root: Path = Path(".hydrolab-data/runs")
+    # 解释器：默认使用当前 Python；生产建议显式指向环境版本对应的解释器。
+    runner_python_executable: str | None = None
+    # 只读数据根：Runner 会把它软链/映射到工作目录，供代码以相对路径访问。
+    runner_data_root: Path | None = None
+    runner_default_timeout_seconds: int = 6 * 3600
+
     # --- 配额 ---
     storage_quota_bytes: int = 500 * 1024**3
     storage_low_watermark_bytes: int = 50 * 1024**3
@@ -95,6 +108,8 @@ class Settings(BaseSettings):
             problems.append("Celery 后端已启用但 HYDROLAB_REDIS_URL 未配置")
         if self.experiment_tracker_backend == "mlflow" and not self.mlflow_tracking_uri:
             problems.append("MLflow 后端已启用但 HYDROLAB_MLFLOW_TRACKING_URI 未配置")
+        if self.run_executor_backend == "subprocess":
+            problems.append("subprocess Runner 缺少容器隔离，禁止在生产环境启用")
         if not self.bootstrap_admin_email or not self.bootstrap_admin_password:
             problems.append("生产环境必须显式配置 BOOTSTRAP_ADMIN_EMAIL/PASSWORD")
         if problems:
