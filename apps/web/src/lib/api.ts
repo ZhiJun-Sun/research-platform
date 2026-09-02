@@ -8,10 +8,16 @@ export type ApiResult = { id: string; run_id: string; dataset_version_id: string
 export type ApiCompatibility = { status: 'COMPATIBLE' | 'REPAIRABLE' | 'INCOMPATIBLE'; blockers: string[]; warnings: string[]; repair_plan: { code: string; title: string }[] }
 
 export type ApiSubmitResponse = { experiment: { id: string; name: string; description: string }; version: { id: string; version_no: number }; run: { id: string; status: string } }
-export type ApiMetric = { name: string; value: number; split: string; basin_id: string | null; event_id: string | null }
+export type ApiMetric = { name: string; value: number; split: string; horizon: number | null; basin_id: string | null; event_id: string | null }
 export type ApiCheckpoint = { id: string; source_config: Record<string, unknown>; model_signature: string }
 export type ApiComparison = { metrics: Record<string, Record<string, number>>; baseline_result_id: string; dataset_version_id: string }
-export type ApiOperation = { id: string }
+export type ApiBatchSubmitItem = { dataset_version_id: string; name: string; argv: string[]; parameter_values: Record<string, unknown>; run: { id: string; status: string } | null }
+export type ApiBatchSubmitResponse = { dry_run: boolean; items: ApiBatchSubmitItem[] }
+export type ApiArtifact = { id: string; result_id: string; kind: string; object_key: string; sha256: string }
+export type ApiPlotResponse = { plot: { id: string; plot_type: string }; artifacts: ApiArtifact[] }
+export type ApiExport = { id: string; manifest: { format: string; object_key: string; sha256: string; size_bytes: number; files: string[] } }
+export type ApiDataset = { id: string; name: string; description: string }
+export type ApiEnvironment = { id: string; name: string; description: string }
 
 export type ApiTemplate = { id: string; code_repository_id: string; name: string; description: string }
 export type ApiTemplateVersion = { id: string; version_no: number; code_version_id: string; mode: string; argv: string[]; parameters: unknown[] }
@@ -132,6 +138,11 @@ export const createDatasetImport = (datasetId: string) => authed<ApiDatasetImpor
 export const fakeUploadDataset = (jobId: string, filename: string, content: string) => authed<ApiDatasetImport>(`/dataset-imports/${jobId}/fake-upload`, { method: 'POST', body: JSON.stringify({ filename, content }) })
 export const getDatasetMapping = (jobId: string) => authed<ApiFieldMapping>(`/dataset-imports/${jobId}/mapping`)
 export const confirmDatasetMapping = (jobId: string, items: ApiMappingItem[]) => authed<ApiDatasetVersion>(`/dataset-imports/${jobId}/confirm-mapping`, { method: 'POST', body: JSON.stringify({ items }) })
+export const listDatasets = () => authed<ApiDataset[]>('/datasets')
+export const listDatasetVersions = (datasetId: string) => authed<ApiDatasetVersion[]>(`/datasets/${datasetId}/versions`)
+export const listEnvironments = () => authed<ApiEnvironment[]>('/environments')
+export const listEnvironmentVersions = (environmentId: string) => authed<Array<{ id: string; version_no: number; status: string }>>(`/environments/${environmentId}/versions`)
+export const submitBatch = (body: { name_prefix: string; description: string; dataset_version_ids: string[]; code_version_id: string; template_version_id: string; environment_version_id: string; parameter_values: Record<string, unknown>; dry_run: boolean }) => authed<ApiBatchSubmitResponse>('/runs/batch', { method: 'POST', body: JSON.stringify(body) })
 export const createDraft = (name: string, description: string) => authed<ApiDraft>('/experiment-drafts', { method: 'POST', body: JSON.stringify({ name, description }) })
 export const listDrafts = () => authed<ApiDraft[]>('/experiment-drafts')
 export const updateDraft = (draftId: string, patch: Partial<Pick<ApiDraft, 'dataset_version_id' | 'code_version_id' | 'template_version_id' | 'environment_version_id' | 'parameter_values'>>) => authed<ApiDraft>(`/experiment-drafts/${draftId}`, { method: 'PATCH', body: JSON.stringify(patch) })
@@ -141,5 +152,5 @@ export const listCheckpoints = () => authed<ApiCheckpoint[]>('/checkpoints')
 export const listResults = () => authed<ApiResult[]>('/results')
 export const listMetrics = (resultId: string) => authed<ApiMetric[]>(`/results/${resultId}/metrics`)
 export const compareResults = (resultIds: string[]) => authed<ApiComparison>('/results/compare', { method: 'POST', body: JSON.stringify({ result_ids: resultIds }) })
-export const createPlot = (resultIds: string[]) => authed<ApiOperation>('/plots', { method: 'POST', body: JSON.stringify({ result_ids: resultIds, plot_type: 'hydrograph', data_selection: {}, options: {} }) })
-export const createExport = (resultIds: string[]) => authed<ApiOperation>('/exports', { method: 'POST', body: JSON.stringify({ result_ids: resultIds, artifact_ids: [] }) })
+export const createPlot = (resultIds: string[], plotType: 'grouped_metrics' | 'horizon_lines' | 'nse_kge_panels' | 'basin_metric_distribution' = 'grouped_metrics', options: Record<string, unknown> = {}) => authed<ApiPlotResponse>('/plots', { method: 'POST', body: JSON.stringify({ result_ids: resultIds, plot_type: plotType, data_selection: {}, options }) })
+export const createExport = (resultIds: string[], artifactIds: string[] = []) => authed<ApiExport>('/exports', { method: 'POST', body: JSON.stringify({ result_ids: resultIds, artifact_ids: artifactIds }) })

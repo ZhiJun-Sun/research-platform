@@ -1,5 +1,7 @@
 """B5/B6 Fake Runner、GPU lease 与 Run 观测 API 测试。"""
 
+from uuid import UUID
+
 from tests.conftest import TestContext
 from tests.test_experiments import _ready_assets
 
@@ -70,3 +72,35 @@ async def test_run_events_support_cursor_and_sse_resume(ctx: TestContext) -> Non
     )
     assert stream.status_code == 200
     assert "run.metric.reported" in stream.text
+
+
+async def test_gpu_fifo_scheduler_starts_two_and_queues_the_third(ctx: TestContext) -> None:
+    """双 GPU 时调度器同轮启动两个 Run；第三个保持 FIFO 等待直到出现空卡。"""
+    from hydrolab.execution.scheduler import GpuFifoScheduler
+
+    _, first = await _queued_run(ctx)
+    _, second = await _queued_run(ctx)
+    _, third = await _queued_run(ctx)
+    scheduler = GpuFifoScheduler(ctx.app.state.runs, ctx.app.state.run_control_service)
+
+    first_tick = await scheduler.tick()
+    assert first_tick == {"finalized": 0, "started": 2}
+    assert (await ctx.app.state.runs.get(UUID(first))).status == "RUNNING"
+    assert (await ctx.app.state.runs.get(UUID(second))).status == "RUNNING"
+    assert (await ctx.app.state.runs.get(UUID(third))).status == "QUEUED"
+    assert set(ctx.app.state.gpu_leases.items) == {0, 1}
+    # GPU 租约必须成为子进程环境：不能只“显示分到卡”，实际却让两个训练都抢 GPU0。
+    executor = ctx.app.state.run_control_service._executor
+    current_specs = []
+    for run_id in (UUID(first), UUID(second)):
+        execution = await ctx.app.state.executions.get(run_id)
+        assert execution is not None
+        current_specs.append(executor.started_specs[execution.external_id])
+    assert {spec.env["CUDA_VISIBLE_DEVICES"] for spec in current_specs} == {"0", "1"}
+
+    # Fake 执行器需要显式结束；租约释放后，下一个 tick 应自动启动第三条。
+    await ctx.app.state.run_control_service.complete_fake(UUID(first))
+    second_tick = await scheduler.tick()
+    assert second_tick == {"finalized": 0, "started": 1}
+    assert (await ctx.app.state.runs.get(UUID(third))).status == "RUNNING"
+    assert set(ctx.app.state.gpu_leases.items) == {0, 1}

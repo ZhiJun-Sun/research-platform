@@ -23,6 +23,7 @@ class MetricPoint(BaseModel):
     name: str
     value: float
     split: str = "test"
+    horizon: int | None = None
     basin_id: str | None = None
     event_id: str | None = None
 

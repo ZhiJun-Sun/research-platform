@@ -10,7 +10,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from hydrolab import __version__
-from hydrolab.adapters.fake.run_executor import FakeRunExecutor
 from hydrolab.adapters.fake.task_queue import FakeTaskQueue
 from hydrolab.api.container import build_repositories, build_services
 from hydrolab.api.deps import get_object_storage, get_run_executor
@@ -54,6 +53,7 @@ from hydrolab.execution.memory import (
     InMemoryResourceSamples,
     InMemoryRunEvents,
 )
+from hydrolab.execution.scheduler import GpuFifoScheduler
 from hydrolab.execution.service import RunControlService
 from hydrolab.experiments.memory import (
     InMemoryDrafts,
@@ -174,6 +174,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.export_manifests,
         app.state.runs,
         app.state.experiment_versions,
+        storage,
     )
 
     app.state.checkpoints = InMemoryCheckpoints()
@@ -194,7 +195,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async def _sink(run_id: object, line: str) -> None:
             await app.state.run_logs.append(run_id, line)
 
-        executor._log_sink = _sink  # type: ignore[attr-defined]
+        executor._log_sink = _sink
 
     app.state.run_control_service = RunControlService(
         app.state.runs,
@@ -216,6 +217,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         dataset_versions=app.state.dataset_versions,
         artifacts=app.state.artifacts,
     )
+
+    # 单机双卡 FIFO 调度只对真实 Runner 启用。Fake 后端保留显式 start/complete
+    # 语义，既避免测试自动推进，也便于接口级状态机调试。
+    if app.state.run_control_service.is_real_executor:
+        app.state.gpu_scheduler = GpuFifoScheduler(app.state.runs, app.state.run_control_service)
+        app.state.gpu_scheduler.start()
+    else:
+        app.state.gpu_scheduler = None
 
     # 首个管理员 bootstrap：仅系统无用户时执行一次
     email = settings.bootstrap_admin_email
@@ -246,7 +255,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         experiment_tracker_backend=settings.experiment_tracker_backend,
         run_executor_backend=settings.run_executor_backend,
     )
-    yield
+    try:
+        yield
+    finally:
+        if app.state.gpu_scheduler is not None:
+            await app.state.gpu_scheduler.stop()
 
 
 def create_app() -> FastAPI:

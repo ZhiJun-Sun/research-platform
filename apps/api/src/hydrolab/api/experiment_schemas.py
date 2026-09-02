@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from hydrolab.experiments.enums import DraftStatus, RunStatus
 
@@ -59,6 +59,32 @@ class SubmitResponse(BaseModel):
     experiment: ExperimentView
     version: ExperimentVersionView
     run: RunView
+
+
+class BatchSubmitInput(BaseModel):
+    """One immutable Run is created for each selected data version."""
+
+    name_prefix: str
+    description: str = ""
+    dataset_version_ids: list[UUID]
+    code_version_id: UUID
+    template_version_id: UUID
+    environment_version_id: UUID
+    parameter_values: dict[str, Any] = Field(default_factory=dict)
+    dry_run: bool = False
+
+
+class BatchSubmitItem(BaseModel):
+    dataset_version_id: UUID
+    name: str
+    argv: list[str]
+    parameter_values: dict[str, Any]
+    run: RunView | None = None
+
+
+class BatchSubmitResponse(BaseModel):
+    dry_run: bool
+    items: list[BatchSubmitItem]
 
 
 class RunStageView(BaseModel):

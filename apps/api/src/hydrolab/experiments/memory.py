@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from hydrolab.experiments.entities import Experiment, ExperimentDraft, ExperimentVersion, OutboxEvent, Run, RunStage
-from hydrolab.experiments.enums import OutboxStatus
+from hydrolab.experiments.enums import OutboxStatus, RunStatus
 
 
 class InMemoryDrafts:
@@ -79,6 +79,18 @@ class InMemoryRuns:
             key=lambda x: x.created_at,
             reverse=True,
         )
+
+    async def list_queued(self) -> list[Run]:
+        """FIFO 队列视图：最早提交的 QUEUED Run 优先获得 GPU。"""
+        return sorted(
+            (x for x in self.items.values() if x.status == RunStatus.QUEUED),
+            key=lambda x: x.created_at,
+        )
+
+    async def list_active(self) -> list[Run]:
+        """调度器轮询用：返回所有持有执行状态的 Run。"""
+        active = {RunStatus.PREPARING, RunStatus.RUNNING}
+        return [x for x in self.items.values() if x.status in active]
 
     async def get_by_idempotency(self, owner_id: UUID, key: str) -> Run | None:
         return next((x for x in self.items.values() if x.owner_id == owner_id and x.idempotency_key == key), None)

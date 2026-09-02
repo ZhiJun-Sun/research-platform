@@ -9,13 +9,13 @@ import asyncio
 import json
 from datetime import timedelta
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from hydrolab.adapters.fake.run_executor import FakeRunExecutor
 from hydrolab.adapters.fake.task_queue import FakeTaskQueue
 from hydrolab.core.errors import conflict, not_found, validation_error
 from hydrolab.domain.entities import utcnow
+from hydrolab.adapters.fake.run_executor import FakeRunExecutor
 from hydrolab.execution.collector import ArtifactCollector, CollectionReport
 from hydrolab.execution.entities import ResourceSample, RunExecution
 from hydrolab.execution.memory import (
@@ -28,6 +28,7 @@ from hydrolab.execution.memory import (
 from hydrolab.experiments.entities import Run
 from hydrolab.experiments.enums import OutboxStatus, RunStatus
 from hydrolab.experiments.repositories import ExperimentVersionStore, OutboxStore, RunStore
+from hydrolab.ports.run_executor import RunExecutor
 from hydrolab.ports.dto import EventType, RunHandle, RunSpec, RunState, TaskEnvelope
 
 
@@ -42,7 +43,7 @@ class RunControlService:
         logs: InMemoryLogs,
         samples: InMemoryResourceSamples,
         queue: FakeTaskQueue,
-        executor: FakeRunExecutor,
+        executor: RunExecutor,
         versions: ExperimentVersionStore | None = None,
         code_versions: Any | None = None,
         template_versions: Any | None = None,
@@ -93,6 +94,10 @@ class RunControlService:
         await self._event(EventType.STATUS_CHANGED, run_id, {"status": run.status.value})
         try:
             spec = await self._build_spec(run, gpu_count)
+            # lease 是 GPU 分配的唯一事实来源；SubprocessRunExecutor 会将 env 原样
+            # 传给子进程，因此 CUDA_VISIBLE_DEVICES 可确保双 Run 分别落在 GPU 0/1。
+            spec.env["CUDA_VISIBLE_DEVICES"] = ",".join(str(lease.gpu_index) for lease in leases)
+            spec.env["HYDROLAB_GPU_INDICES"] = spec.env["CUDA_VISIBLE_DEVICES"]
         except Exception:
             await self._leases.release_run(run_id)
             run.status, run.updated_at = RunStatus.FAILED, utcnow()
@@ -353,7 +358,9 @@ class RunControlService:
         execution = await self._executions.get(run_id)
         if execution is None:
             raise conflict("Run 未在执行")
-        self._executor.complete(execution.external_id, exit_code)
+        # 此入口仅由 Fake Runner 的测试/内部接口调用；运行时显式收窄。
+        fake_executor = cast(FakeRunExecutor, self._executor)
+        fake_executor.complete(execution.external_id, exit_code)
         run.status, run.updated_at = (RunStatus.SUCCEEDED if exit_code == 0 else RunStatus.FAILED), utcnow()
         await self._leases.release_run(run_id)
         await self._executions.remove(run_id)

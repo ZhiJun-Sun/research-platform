@@ -72,6 +72,20 @@ HYDROLAB_CODE_IMPORT_ROOTS=["/srv/projects"]         # 目录导入白名单
 其中 `BUNDLE`（zip）用于一个版本内含多文件与子目录的场景（水文数据常见：
 多流域时序表 + 静态属性 + 子目录），导入时会清点内容并拒绝路径穿越与解压炸弹。
 
+#### 双 4090 自动调度
+
+`subprocess` Runner 启用时，API 生命周期会启动单机 FIFO 调度器：每秒扫描一次队列，
+默认将最早创建的两个 `QUEUED` Run 分别启动在 GPU 0 / GPU 1 上；其余 Run 保持排队。
+任一任务结束后，调度器采集产物、释放对应 GPU 租约，并在下一轮自动启动队首任务。
+
+- 每张 GPU 默认只跑一个 Run，避免训练显存互相挤占；
+- 分配的租约会注入子进程环境：`CUDA_VISIBLE_DEVICES=0` 或 `=1`，同时写入
+  `HYDROLAB_GPU_INDICES`，因此不是“逻辑上分卡、实际都跑 GPU0”；
+- `POST /runs/{id}/start` 仍保留，便于单条手动调试；正常批量场景不必逐条调用；
+- Fake Runner 不启用自动调度，维持显式 `start/complete` 的测试与调试语义；
+- 当前队列/租约是进程内状态：**API 重启会丢失排队信息**，因此单机可用但尚非容错队列；
+  生产化前必须完成 Postgres 持久化与 Celery/Redis 队列适配。
+
 链路语义：
 
 1. `POST /code-import-previews` 只读扫描目录，排除 `.venv`/缓存/数据/既有产物；

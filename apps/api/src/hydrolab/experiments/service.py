@@ -135,6 +135,101 @@ class ExperimentService:
         await self._drafts.update(draft)
         return experiment, version, run
 
+    async def submit_batch(
+        self,
+        owner: User,
+        *,
+        name_prefix: str,
+        description: str,
+        dataset_version_ids: list[UUID],
+        code_version_id: UUID,
+        template_version_id: UUID,
+        environment_version_id: UUID,
+        parameter_values: dict[str, Any],
+        dry_run: bool,
+    ) -> list[dict[str, Any]]:
+        """Expand selected data versions into independently reproducible queued Runs."""
+        if not name_prefix.strip():
+            raise validation_error("批量实验名称不能为空")
+        if not dataset_version_ids:
+            raise validation_error("至少需要选择一个数据版本")
+        if len(dataset_version_ids) != len(set(dataset_version_ids)):
+            raise validation_error("数据版本不可重复选择")
+
+        prepared: list[tuple[ExperimentDraft, dict[str, Any], str]] = []
+        for index, dataset_version_id in enumerate(dataset_version_ids, start=1):
+            name = f"{name_prefix.strip()} · 数据集 {index}"
+            draft = ExperimentDraft(
+                owner_id=owner.id,
+                name=name,
+                description=description,
+                dataset_version_id=dataset_version_id,
+                code_version_id=code_version_id,
+                template_version_id=template_version_id,
+                environment_version_id=environment_version_id,
+                parameter_values=parameter_values,
+            )
+            prepared.append((draft, await self._resolve_config(owner, draft), name))
+
+        if dry_run:
+            return [
+                {
+                    "dataset_version_id": draft.dataset_version_id,
+                    "name": name,
+                    "argv": config["argv"],
+                    "parameter_values": config["parameters"],
+                    "run": None,
+                }
+                for draft, config, name in prepared
+            ]
+
+        items: list[dict[str, Any]] = []
+        for draft, config, name in prepared:
+            experiment = await self._experiments.add(
+                Experiment(owner_id=owner.id, name=name, description=description)
+            )
+            await self._grants.add(
+                ResourceGrant(
+                    resource_type=ResourceType.EXPERIMENT,
+                    resource_id=experiment.id,
+                    subject_id=owner.id,
+                    role=Role.OWNER,
+                    granted_by=owner.id,
+                )
+            )
+            encoded = json.dumps(config, sort_keys=True, separators=(",", ":"))
+            version = await self._versions.add(
+                ExperimentVersion(
+                    experiment_id=experiment.id,
+                    version_no=1,
+                    resolved_config=config,
+                    config_hash=hashlib.sha256(encoded.encode()).hexdigest(),
+                )
+            )
+            run = await self._runs.add(
+                Run(experiment_id=experiment.id, experiment_version_id=version.id, owner_id=owner.id)
+            )
+            for position, stage_name in enumerate(RunStageName):
+                await self._stages.add(RunStage(run_id=run.id, name=stage_name, position=position))
+            await self._outbox.add(
+                OutboxEvent(
+                    aggregate_type="RUN",
+                    aggregate_id=run.id,
+                    topic="run.requested",
+                    payload={"run_id": str(run.id), "experiment_version_id": str(version.id)},
+                )
+            )
+            items.append(
+                {
+                    "dataset_version_id": draft.dataset_version_id,
+                    "name": name,
+                    "argv": config["argv"],
+                    "parameter_values": config["parameters"],
+                    "run": run,
+                }
+            )
+        return items
+
     async def get_experiment(self, actor: User, experiment_id: UUID) -> Experiment:
         experiment = await self._experiments.get(experiment_id)
         if experiment is None:

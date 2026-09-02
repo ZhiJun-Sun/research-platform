@@ -16,6 +16,7 @@ class MetricInput(BaseModel):
     name: str
     value: float
     split: str = "test"
+    horizon: int | None = None
     basin_id: str | None = None
     event_id: str | None = None
 
@@ -67,7 +68,13 @@ async def ingest_result(run_id: UUID, request: Request, user: User = Depends(get
     metrics_added = 0
     if report.metrics:
         points = [
-            MetricPoint(result_id=result.id, name=item.name, value=item.value, split=item.split)
+            MetricPoint(
+                result_id=result.id,
+                name=item.name,
+                value=item.value,
+                split=item.split,
+                horizon=item.horizon,
+            )
             for item in report.metrics
         ]
         metrics_added = len(await result_service.add_metrics(user, result.id, points))

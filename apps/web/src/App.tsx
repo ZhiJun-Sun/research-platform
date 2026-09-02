@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getRealSection, getStoredUser, getWorkspace, importCodeDirectory, importCodeGit, importCodeZip, listCodeImportRoots, listCheckpoints, listCodeRepositories, listCodeVersions, listDrafts, listMetrics, listResults, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, seedDemo, submitDraft, updateDraft } from './lib/api'
-import type { ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiDirectoryPreview, ApiMappingItem, ApiRun, ApiUser } from './lib/api'
+import { advanceRun, ApiError, cancelRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getRealSection, getStoredUser, getWorkspace, importCodeDirectory, importCodeGit, importCodeZip, listCodeImportRoots, listCheckpoints, listCodeRepositories, listCodeVersions, listDatasetVersions, listDatasets, listDrafts, listEnvironments, listEnvironmentVersions, listMetrics, listResults, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, seedDemo, submitBatch, submitDraft, updateDraft } from './lib/api'
+import type { ApiBatchSubmitItem, ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiDataset, ApiDatasetVersion, ApiDirectoryPreview, ApiEnvironment, ApiMappingItem, ApiRun, ApiTemplate, ApiTemplateVersion, ApiUser } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -369,6 +369,51 @@ function AdvancedExperimentForm() {
   return <div className="advanced-form">{sections.map(section => <section key={section.id}><button className="advanced-section-head" onClick={() => setOpenSections(current => ({ ...current, [section.id]: !current[section.id] }))}><ChevronDown className={!openSections[section.id] ? 'collapsed' : ''} size={16}/><div><b>{section.title}</b><span>{section.summary}</span></div></button>{openSections[section.id] && (section.id === 'runtime' ? <div className="advanced-parameters"><ParameterEditor/><div className="parameter-grid runtime-fields"><label>运行环境<select><option>PyTorch 2.4 · CUDA 12.4 · env-v3</option><option>PyTorch 2.2 · CUDA 12.1 · env-v2</option></select></label><label>GPU 资源<select><option>自动分配单张 GPU</option></select></label></div></div> : <div className="advanced-fields">{section.fields.map(([label,value]) => <label key={label}>{label}<input defaultValue={value}/></label>)}</div>)}</section>)}</div>
 }
 
+function BatchSubmitPanel({ close }: { close: () => void }) {
+  const [datasets, setDatasets] = useState<ApiDataset[]>([])
+  const [datasetVersions, setDatasetVersions] = useState<Array<ApiDatasetVersion & { datasetName: string }>>([])
+  const [repositories, setRepositories] = useState<ApiCodeRepository[]>([])
+  const [codeVersions, setCodeVersions] = useState<ApiCodeVersion[]>([])
+  const [templates, setTemplates] = useState<ApiTemplate[]>([])
+  const [templateVersions, setTemplateVersions] = useState<ApiTemplateVersion[]>([])
+  const [environments, setEnvironments] = useState<ApiEnvironment[]>([])
+  const [environmentVersions, setEnvironmentVersions] = useState<Array<{ id: string; version_no: number; status: string; environmentName: string }>>([])
+  const [selectedDatasetIds, setSelectedDatasetIds] = useState<string[]>([])
+  const [codeVersionId, setCodeVersionId] = useState('')
+  const [templateVersionId, setTemplateVersionId] = useState('')
+  const [environmentVersionId, setEnvironmentVersionId] = useState('')
+  const [namePrefix, setNamePrefix] = useState('批量水文训练')
+  const [epochs, setEpochs] = useState('20')
+  const [preview, setPreview] = useState<ApiBatchSubmitItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => { void (async () => {
+    try {
+      const [loadedDatasets, loadedRepositories, loadedTemplates, loadedEnvironments] = await Promise.all([
+        listDatasets(), listCodeRepositories(), listTemplates(), listEnvironments(),
+      ])
+      setDatasets(loadedDatasets); setRepositories(loadedRepositories); setTemplates(loadedTemplates); setEnvironments(loadedEnvironments)
+      const versions = await Promise.all(loadedDatasets.map(async dataset => (await listDatasetVersions(dataset.id)).map(version => ({ ...version, datasetName: dataset.name }))))
+      setDatasetVersions(versions.flat().filter(version => version.status === 'READY'))
+      const code = await Promise.all(loadedRepositories.map(listCodeVersions)); setCodeVersions(code.flat().filter(version => version.status === 'READY'))
+      const template = await Promise.all(loadedTemplates.map(listTemplateVersions)); setTemplateVersions(template.flat())
+      const environment = await Promise.all(loadedEnvironments.map(async item => (await listEnvironmentVersions(item.id)).map(version => ({ ...version, environmentName: item.name }))))
+      setEnvironmentVersions(environment.flat().filter(version => version.status === 'READY'))
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : '加载可运行资源失败') } finally { setLoading(false) }
+  })() }, [])
+
+  const valid = Boolean(namePrefix.trim() && selectedDatasetIds.length && codeVersionId && templateVersionId && environmentVersionId && Number(epochs) > 0)
+  const buildBody = (dry_run: boolean) => ({ name_prefix: namePrefix, description: '网页批量提交', dataset_version_ids: selectedDatasetIds, code_version_id: codeVersionId, template_version_id: templateVersionId, environment_version_id: environmentVersionId, parameter_values: { epochs: Number(epochs) }, dry_run })
+  const toggleDataset = (id: string) => setSelectedDatasetIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+  const makePreview = async () => { if (!valid) return; setSubmitting(true); setError(null); try { setPreview((await submitBatch(buildBody(true))).items) } catch (cause) { setError(cause instanceof ApiError ? cause.message : '预览生成失败') } finally { setSubmitting(false) } }
+  const enqueue = async () => { if (!valid) return; setSubmitting(true); setError(null); try { const result = await submitBatch(buildBody(false)); setPreview(result.items); setMessage(`已将 ${result.items.length} 个实验放入队列，双卡调度器会自动执行。`) } catch (cause) { setError(cause instanceof ApiError ? cause.message : '批量入队失败') } finally { setSubmitting(false) } }
+
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="批量提交实验"><div className="wizard-modal batch-submit-modal"><header><div><span className="mono-label">BATCH LAUNCH</span><h2>一键并行提交实验</h2><p>每个已选数据版本生成一个独立、可复现的 Run；GPU 将以单卡单任务 FIFO 自动调度。</p></div><button className="icon-button" onClick={close} aria-label="关闭"><X size={18}/></button></header><main className="batch-submit-body">{loading ? <p>正在加载可运行资源…</p> : <><div className="form-stack"><label>批次名称<input value={namePrefix} onChange={event => setNamePrefix(event.target.value)} placeholder="例如：Top-30 流域扫描"/></label><label>训练 Epoch<input type="number" min="1" value={epochs} onChange={event => setEpochs(event.target.value)}/></label><label>代码版本<select value={codeVersionId} onChange={event => setCodeVersionId(event.target.value)}><option value="">选择已冻结代码版本</option>{codeVersions.map(version => <option key={version.id} value={version.id}>代码 v{version.version_no} · {version.content_hash?.slice(0, 8) ?? version.id.slice(0, 8)}</option>)}</select></label><label>训练模板<select value={templateVersionId} onChange={event => setTemplateVersionId(event.target.value)}><option value="">选择训练模板版本</option>{templateVersions.filter(version => !codeVersionId || version.code_version_id === codeVersionId).map(version => <option key={version.id} value={version.id}>模板 v{version.version_no} · {version.argv.join(' ')}</option>)}</select></label><label>运行环境<select value={environmentVersionId} onChange={event => setEnvironmentVersionId(event.target.value)}><option value="">选择运行环境版本</option>{environmentVersions.map(version => <option key={version.id} value={version.id}>{version.environmentName} · v{version.version_no}</option>)}</select></label></div><section className="detail-section"><div className="section-heading"><div><h3>选择数据版本</h3><p>勾选后，每个版本都会展开为一条独立的训练任务。</p></div><span className="status-badge neutral">已选 {selectedDatasetIds.length}</span></div><div className="selection-list">{datasetVersions.map(version => <label className={selectedDatasetIds.includes(version.id) ? 'selected' : ''} key={version.id}><input type="checkbox" checked={selectedDatasetIds.includes(version.id)} onChange={() => toggleDataset(version.id)}/><Database size={16}/><div><b>{version.datasetName} · v{version.version_no}</b><span>{String(version.manifest.format ?? '数据包')} · {version.content_hash?.slice(0, 10) ?? '未记录内容摘要'}</span></div></label>)}{!datasetVersions.length && <p>没有 READY 数据版本；请先在“数据”页导入并冻结数据。</p>}</div></section>{preview.length > 0 && <section className="plot-plan"><span className="mono-label">QUEUE PREVIEW</span><p>将创建 {preview.length} 个 Run：</p>{preview.map(item => <div key={item.dataset_version_id}><b>{item.name}</b><code>{item.argv.join(' ')}</code></div>)}</section>}{error && <p className="error-notice">{error}</p>}{message && <p className="success-notice">{message}</p>}</>}</main><footer><button className="button secondary" onClick={close}>取消</button><button className="button secondary" disabled={!valid || submitting} onClick={() => void makePreview}>{submitting ? '处理中…' : '预览任务'}</button><button className="button primary" disabled={!valid || submitting} onClick={() => void enqueue}><Play size={15}/>{submitting ? '入队中…' : `确认入队 ${selectedDatasetIds.length || ''}`}</button></footer></div></div>
+}
+
 function ExperimentWizard({ close }: { close: () => void }) {
   const [step, setStep] = useState(1)
   const [createMode, setCreateMode] = useState<'wizard' | 'advanced'>('wizard')
@@ -717,7 +762,7 @@ export default function App() {
           {view === 'run' && <RunDetail back={() => setView('dashboard')} />}
         </div>
       </main>
-      {wizardOpen && <ExperimentWizard close={() => setWizardOpen(false)} />}
+      {wizardOpen && <BatchSubmitPanel close={() => setWizardOpen(false)} />}
       {gpuOpen && <GpuDrawer close={() => setGpuOpen(false)} />}
       {datasetCreateOpen && <DatasetCreateModal close={() => setDatasetCreateOpen(false)} />}
     </div>

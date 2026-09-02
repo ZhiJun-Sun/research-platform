@@ -46,6 +46,9 @@ class InMemoryArtifacts:
     async def get(self, item_id: UUID) -> ResultArtifact | None:
         return self.items.get(item_id)
 
+    async def list_by_result(self, result_id: UUID) -> list[ResultArtifact]:
+        return [item for item in self.items.values() if item.result_id == result_id]
+
 
 class InMemoryPlots:
     def __init__(self) -> None:

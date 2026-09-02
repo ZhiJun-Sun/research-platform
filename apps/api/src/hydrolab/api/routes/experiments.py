@@ -5,6 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 
 from hydrolab.api.experiment_schemas import (
+    BatchSubmitInput,
+    BatchSubmitItem,
+    BatchSubmitResponse,
     DraftCreate,
     DraftUpdate,
     DraftView,
@@ -73,6 +76,36 @@ async def submit_draft(draft_id: UUID, request: Request, user: User = Depends(ge
         user, draft_id, request.headers.get("idempotency-key")
     )
     return SubmitResponse(experiment=_experiment(experiment), version=_version(version), run=_run(run))
+
+
+@router.post("/runs/batch", response_model=BatchSubmitResponse, status_code=201)
+async def submit_batch(
+    body: BatchSubmitInput, request: Request, user: User = Depends(get_current_user)
+) -> BatchSubmitResponse:
+    items = await request.app.state.experiment_service.submit_batch(
+        user,
+        name_prefix=body.name_prefix,
+        description=body.description,
+        dataset_version_ids=body.dataset_version_ids,
+        code_version_id=body.code_version_id,
+        template_version_id=body.template_version_id,
+        environment_version_id=body.environment_version_id,
+        parameter_values=body.parameter_values,
+        dry_run=body.dry_run,
+    )
+    return BatchSubmitResponse(
+        dry_run=body.dry_run,
+        items=[
+            BatchSubmitItem(
+                dataset_version_id=item["dataset_version_id"],
+                name=item["name"],
+                argv=item["argv"],
+                parameter_values=item["parameter_values"],
+                run=_run(item["run"]) if item["run"] is not None else None,
+            )
+            for item in items
+        ],
+    )
 
 
 @router.get("/experiments", response_model=list[ExperimentView])

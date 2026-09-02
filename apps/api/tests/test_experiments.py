@@ -114,3 +114,43 @@ async def test_submit_rejects_missing_or_invalid_parameter_values(ctx: TestConte
     )
     invalid = await ctx.client.post(f"/api/v1/experiment-drafts/{draft.json()['id']}/submit", headers=headers)
     assert invalid.status_code == 422
+
+
+async def test_batch_submit_previews_then_creates_one_run_per_dataset(ctx: TestContext) -> None:
+    headers, assets = await _ready_assets(ctx)
+    dataset = await ctx.client.post("/api/v1/datasets", json={"name": "北江二号"}, headers=headers)
+    job = await ctx.client.post(
+        "/api/v1/dataset-imports", json={"dataset_id": dataset.json()["id"], "source_type": "UPLOAD"}, headers=headers
+    )
+    await ctx.client.post(
+        f"/api/v1/dataset-imports/{job.json()['id']}/fake-upload",
+        json={"filename": "data-2.csv", "content": "date,flow\n2020-01-01,2\n"},
+        headers=headers,
+    )
+    mapping = await ctx.client.get(f"/api/v1/dataset-imports/{job.json()['id']}/mapping", headers=headers)
+    second_version = await ctx.client.post(
+        f"/api/v1/dataset-imports/{job.json()['id']}/confirm-mapping",
+        json={"items": mapping.json()["items"]},
+        headers=headers,
+    )
+    body = {
+        "name_prefix": "北江批量实验",
+        "description": "两个流域版本并行排队",
+        "dataset_version_ids": [assets["dataset_version_id"], second_version.json()["id"]],
+        "code_version_id": assets["code_version_id"],
+        "template_version_id": assets["template_version_id"],
+        "environment_version_id": assets["environment_version_id"],
+        "parameter_values": {"epochs": 2},
+    }
+    preview = await ctx.client.post("/api/v1/runs/batch", json={**body, "dry_run": True}, headers=headers)
+    assert preview.status_code == 201, preview.text
+    assert [item["run"] for item in preview.json()["items"]] == [None, None]
+    assert len(await ctx.app.state.runs.list_queued()) == 0
+
+    submitted = await ctx.client.post("/api/v1/runs/batch", json=body, headers=headers)
+    assert submitted.status_code == 201, submitted.text
+    items = submitted.json()["items"]
+    assert len(items) == 2
+    assert all(item["run"]["status"] == "QUEUED" for item in items)
+    assert len(await ctx.app.state.runs.list_queued()) == 2
+    assert len(await ctx.app.state.outbox.list_pending()) == 2

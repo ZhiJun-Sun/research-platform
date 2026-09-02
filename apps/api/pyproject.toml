@@ -9,8 +9,8 @@ dependencies = [
     "pydantic>=2.7,<3.0",
     "pydantic-settings>=2.3,<3.0",
     "email-validator>=2.3.0",
-    # xlsx 数据导入探测（水文数据常见格式）
-    "openpyxl>=3.1,<4.0",
+    # 论文级结果图渲染（服务端使用 Agg 无界面后端）
+    "matplotlib>=3.9,<4.0",
 ]
 
 [dependency-groups]
