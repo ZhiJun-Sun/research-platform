@@ -10,25 +10,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from hydrolab import __version__
-from hydrolab.adapters.fake.task_queue import FakeTaskQueue
 from hydrolab.api.container import build_repositories, build_services
-from hydrolab.api.deps import get_object_storage, get_run_executor
+from hydrolab.api.deps import (
+    get_experiment_tracker,
+    get_object_storage,
+    get_run_executor,
+    get_task_queue,
+)
 from hydrolab.api.routes import api_v1_router
 from hydrolab.api.routes.dev_demo import router as dev_demo_router
 from hydrolab.api.routes.health import router as health_router
-from hydrolab.checkpoints.memory import InMemoryCheckpoints
 from hydrolab.checkpoints.service import CheckpointService
 from hydrolab.code_assets.directory_import import DirectoryImportService
 from hydrolab.code_assets.imports import CodeImportService
-from hydrolab.code_assets.memory import (
-    InMemoryCodeRepositories,
-    InMemoryCodeVersions,
-    InMemoryEnvironments,
-    InMemoryEnvironmentVersions,
-    InMemoryPresets,
-    InMemoryTemplates,
-    InMemoryTemplateVersions,
-)
 from hydrolab.code_assets.services import TemplateEnvironmentService
 from hydrolab.core.errors import register_error_handlers
 from hydrolab.core.logging import configure_logging, get_logger, log_with
@@ -37,34 +31,12 @@ from hydrolab.core.rate_limit import FixedWindowRateLimiter
 from hydrolab.core.settings import get_settings
 from hydrolab.datasets.assets import AssetService
 from hydrolab.datasets.imports import ImportService
-from hydrolab.datasets.memory import (
-    InMemoryArtifactRepository,
-    InMemoryDatasetRepository,
-    InMemoryDatasetVersionRepository,
-    InMemoryFieldMappingRepository,
-    InMemoryFolderRepository,
-    InMemoryImportJobRepository,
-)
+from hydrolab.db.unit_of_work import UnitOfWork
 from hydrolab.execution.collector import ArtifactCollector
-from hydrolab.execution.memory import (
-    InMemoryExecutions,
-    InMemoryGpuLeases,
-    InMemoryLogs,
-    InMemoryResourceSamples,
-    InMemoryRunEvents,
-)
+from hydrolab.execution.publisher import OutboxPublisher
 from hydrolab.execution.scheduler import GpuFifoScheduler
 from hydrolab.execution.service import RunControlService
-from hydrolab.experiments.memory import (
-    InMemoryDrafts,
-    InMemoryExperiments,
-    InMemoryExperimentVersions,
-    InMemoryOutbox,
-    InMemoryRuns,
-    InMemoryRunStages,
-)
 from hydrolab.experiments.service import ExperimentService
-from hydrolab.results.memory import InMemoryArtifacts, InMemoryExports, InMemoryMetrics, InMemoryPlots, InMemoryResults
 from hydrolab.results.service import ResultService
 
 _DEV_BOOTSTRAP_EMAIL = "admin@hydrolab.cn"
@@ -76,7 +48,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.validate_production()
 
-    repos = build_repositories()
+    # 数据库接入：database_backend=mysql 时创建 SQL 会话工厂并先执行迁移；
+    # memory 时保持进程内仓储（无库开发/测试）。
+    session_factory = None
+    if settings.database_backend == "mysql":
+        from hydrolab.db.migrate import run_migrations
+        from hydrolab.db.session import dispose, make_session_factory
+
+        run_migrations(settings)
+        session_factory = make_session_factory(settings)
+
+    repos = build_repositories(session_factory)
     services = build_services(settings, repos)
     app.state.repos = repos
     app.state.auth_service = services.auth
@@ -85,13 +67,40 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.access_policy = services.policy
     app.state.shared_rate_limiter = FixedWindowRateLimiter(limit=30, window_seconds=60)
 
-    # B2 数据存储：与 B1 一样采用 InMemory Repository；对象内容复用 Fake/Local ObjectStorage。
-    app.state.folders = InMemoryFolderRepository()
-    app.state.datasets = InMemoryDatasetRepository()
-    app.state.dataset_versions = InMemoryDatasetVersionRepository()
-    app.state.import_jobs = InMemoryImportJobRepository()
-    app.state.field_mappings = InMemoryFieldMappingRepository()
-    app.state.artifacts = InMemoryArtifactRepository()
+    # 领域仓储（B2–B8）：按 database_backend 选择 InMemory 或 SQL 实现。
+    from hydrolab.db.factory import build_domain_stores
+
+    stores = build_domain_stores(settings, session_factory)
+    app.state.folders = stores.folders
+    app.state.datasets = stores.datasets
+    app.state.dataset_versions = stores.dataset_versions
+    app.state.import_jobs = stores.import_jobs
+    app.state.field_mappings = stores.field_mappings
+    app.state.artifacts = stores.artifacts
+    app.state.code_repositories = stores.code_repositories
+    app.state.code_versions = stores.code_versions
+    app.state.templates = stores.templates
+    app.state.template_versions = stores.template_versions
+    app.state.environments = stores.environments
+    app.state.environment_versions = stores.environment_versions
+    app.state.parameter_presets = stores.parameter_presets
+    app.state.experiment_drafts = stores.experiment_drafts
+    app.state.experiments = stores.experiments
+    app.state.experiment_versions = stores.experiment_versions
+    app.state.runs = stores.runs
+    app.state.run_stages = stores.run_stages
+    app.state.outbox = stores.outbox
+    app.state.results = stores.results
+    app.state.result_metrics = stores.result_metrics
+    app.state.result_artifacts = stores.result_artifacts
+    app.state.plot_specs = stores.plot_specs
+    app.state.export_manifests = stores.export_manifests
+    app.state.checkpoints = stores.checkpoints
+    app.state.gpu_leases = stores.gpu_leases
+    app.state.executions = stores.executions
+    app.state.run_events = stores.run_events
+    app.state.run_logs = stores.run_logs
+    app.state.resource_samples = stores.resource_samples
     storage = get_object_storage()
     app.state.asset_service = AssetService(
         app.state.folders, app.state.datasets, repos.grants, services.policy
@@ -106,14 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         services.policy,
     )
 
-    # B3 代码、模板、运行环境：同样保持进程内版本仓储，未来替换为 SQL 实现。
-    app.state.code_repositories = InMemoryCodeRepositories()
-    app.state.code_versions = InMemoryCodeVersions()
-    app.state.templates = InMemoryTemplates()
-    app.state.template_versions = InMemoryTemplateVersions()
-    app.state.environments = InMemoryEnvironments()
-    app.state.environment_versions = InMemoryEnvironmentVersions()
-    app.state.parameter_presets = InMemoryPresets()
+    # B3 代码、模板、运行环境（仓储已由 stores 装配）。
     app.state.code_import_service = CodeImportService(
         app.state.code_repositories,
         app.state.code_versions,
@@ -139,13 +141,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         services.policy,
     )
 
-    # B4 Draft/Experiment/Run：这里仅写入 QUEUED 元数据和 Fake Outbox，不发起训练。
-    app.state.experiment_drafts = InMemoryDrafts()
-    app.state.experiments = InMemoryExperiments()
-    app.state.experiment_versions = InMemoryExperimentVersions()
-    app.state.runs = InMemoryRuns()
-    app.state.run_stages = InMemoryRunStages()
-    app.state.outbox = InMemoryOutbox()
+    # B4 Draft/Experiment/Run：这里仅写入 QUEUED 元数据和 Outbox，不发起训练。
     app.state.experiment_service = ExperimentService(
         app.state.experiment_drafts,
         app.state.experiments,
@@ -159,13 +155,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.environment_versions,
         repos.grants,
         services.policy,
+        transaction_factory=(
+            (lambda: UnitOfWork(session_factory)) if session_factory is not None else None
+        ),
     )
 
-    app.state.results = InMemoryResults()
-    app.state.result_metrics = InMemoryMetrics()
-    app.state.result_artifacts = InMemoryArtifacts()
-    app.state.plot_specs = InMemoryPlots()
-    app.state.export_manifests = InMemoryExports()
     app.state.result_service = ResultService(
         app.state.results,
         app.state.result_metrics,
@@ -177,18 +171,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         storage,
     )
 
-    app.state.checkpoints = InMemoryCheckpoints()
     app.state.checkpoint_service = CheckpointService(
         app.state.checkpoints, app.state.runs, app.state.experiment_versions
     )
 
-    # B5/B6：执行控制与观测。fake 后端只推进状态机；subprocess 后端真实执行并采集产物。
-    app.state.gpu_leases = InMemoryGpuLeases(gpu_count=2)
-    app.state.executions = InMemoryExecutions()
-    app.state.run_events = InMemoryRunEvents()
-    app.state.run_logs = InMemoryLogs()
-    app.state.resource_samples = InMemoryResourceSamples()
-
+    # B5/B6：执行控制与观测（仓储已由 stores 装配）。fake 后端只推进状态机；subprocess 后端真实执行并采集产物。
     executor = get_run_executor()
     # 真实执行器把每行 stdout 回流到 Run 日志，前端可增量拉取。
     if hasattr(executor, "_log_sink"):
@@ -205,8 +192,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.run_events,
         app.state.run_logs,
         app.state.resource_samples,
-        FakeTaskQueue(),
+        get_task_queue(),
         executor,
+        tracker=get_experiment_tracker(),
         versions=app.state.experiment_versions,
         code_versions=app.state.code_versions,
         template_versions=app.state.template_versions,
@@ -220,11 +208,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # 单机双卡 FIFO 调度只对真实 Runner 启用。Fake 后端保留显式 start/complete
     # 语义，既避免测试自动推进，也便于接口级状态机调试。
-    if app.state.run_control_service.is_real_executor:
+    if settings.run_executor_backend == "subprocess":
         app.state.gpu_scheduler = GpuFifoScheduler(app.state.runs, app.state.run_control_service)
         app.state.gpu_scheduler.start()
     else:
         app.state.gpu_scheduler = None
+
+    app.state.outbox_publisher = None
+    if settings.task_queue_backend == "celery":
+        app.state.outbox_publisher = OutboxPublisher(app.state.run_control_service)
 
     # 首个管理员 bootstrap：仅系统无用户时执行一次
     email = settings.bootstrap_admin_email
@@ -256,10 +248,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         run_executor_backend=settings.run_executor_backend,
     )
     try:
+        if app.state.outbox_publisher is not None:
+            app.state.outbox_publisher.start()
         yield
     finally:
+        if app.state.outbox_publisher is not None:
+            await app.state.outbox_publisher.stop()
         if app.state.gpu_scheduler is not None:
             await app.state.gpu_scheduler.stop()
+        if settings.database_backend == "mysql":
+            from hydrolab.db.session import dispose
+
+            await dispose()
 
 
 def create_app() -> FastAPI:

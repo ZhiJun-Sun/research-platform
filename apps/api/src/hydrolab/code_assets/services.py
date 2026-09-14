@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 from typing import Any
 from uuid import UUID
 
@@ -27,6 +28,26 @@ from hydrolab.core.errors import conflict, not_found, validation_error
 from hydrolab.domain.entities import ResourceGrant, User, utcnow
 from hydrolab.domain.enums import ResourceType, Role
 from hydrolab.repositories import GrantRepository
+
+# 不可变镜像 digest 白名单格式：<名称>[@<registry 标签>]@sha256:<64 位小写十六进制>。
+# 拒绝 tag 冒随（无 digest）、占位串、空 digest、非十六进制、非 64 位或含空白/控制字符。
+_DIGEST_RE = re.compile(r"[^\s@]+@sha256:[0-9a-f]{64}")
+_DIGEST_EXAMPLES = "例如：python:3.12@sha256:0123…(共 64 位小写十六进制)"
+
+
+def validate_image_digest(image: str) -> None:
+    """严格校验不可变镜像 digest；非法值一律抛 validation_error。"""
+    if not image or not image.strip():
+        raise validation_error("镜像必须提供不可变 digest，不能为空")
+    stripped = image.strip()
+    if stripped != image:
+        raise validation_error("镜像 digest 不允许首尾空白")
+    if any(ch.isspace() or ord(ch) < 32 for ch in stripped):
+        raise validation_error("镜像 digest 不允许空白或控制字符")
+    if not _DIGEST_RE.fullmatch(stripped):
+        raise validation_error(
+            f"镜像必须使用不可变 digest 格式 <名称>@sha256:<64 位十六进制>（{_DIGEST_EXAMPLES}）"
+        )
 
 
 class TemplateEnvironmentService:
@@ -125,8 +146,7 @@ class TemplateEnvironmentService:
         dependency_content: str | None,
     ) -> EnvironmentVersion:
         await self._policy.require(owner, ResourceType.RUNTIME_ENVIRONMENT, environment_id, Role.OWNER)
-        if not base_image or "@" not in base_image:
-            raise validation_error("基础镜像必须使用不可变 digest，例如 python:3.11@sha256:...")
+        validate_image_digest(base_image)
         if not python_version.startswith("3."):
             raise validation_error("当前仅支持 Python 3.x 环境")
         source = json.dumps(
@@ -146,6 +166,8 @@ class TemplateEnvironmentService:
             python_version=python_version,
             dependency_file=dependency_file,
             dependency_content=dependency_content,
+            # 登记可运行的不可变镜像引用；Docker Runner 白名单按该 digest 校验。
+            image_digest=base_image,
             content_hash=hashlib.sha256(source.encode()).hexdigest(),
             frozen_at=utcnow(),
         )

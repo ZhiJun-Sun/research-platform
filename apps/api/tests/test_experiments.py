@@ -50,7 +50,7 @@ async def _ready_assets(ctx: TestContext) -> tuple[dict[str, str], dict[str, str
     environment = await ctx.client.post("/api/v1/environments", json={"name": "py311"}, headers=headers)
     environment_version = await ctx.client.post(
         f"/api/v1/environments/{environment.json()['id']}/versions",
-        json={"base_image": "python:3.11@sha256:abc", "python_version": "3.11"},
+        json={"base_image": f"python:3.11@sha256:{'a' * 64}", "python_version": "3.11"},
         headers=headers,
     )
     return headers, {
@@ -154,3 +154,38 @@ async def test_batch_submit_previews_then_creates_one_run_per_dataset(ctx: TestC
     assert all(item["run"]["status"] == "QUEUED" for item in items)
     assert len(await ctx.app.state.runs.list_queued()) == 2
     assert len(await ctx.app.state.outbox.list_pending()) == 2
+
+
+async def test_run_summary_endpoints_expose_owner_runs_with_frozen_config(ctx: TestContext) -> None:
+    headers, assets = await _ready_assets(ctx)
+    draft = await ctx.client.post("/api/v1/experiment-drafts", json={"name": "摘要实验"}, headers=headers)
+    await ctx.client.patch(
+        f"/api/v1/experiment-drafts/{draft.json()['id']}",
+        json={**assets, "parameter_values": {"epochs": 7}},
+        headers=headers,
+    )
+    submitted = await ctx.client.post(
+        f"/api/v1/experiment-drafts/{draft.json()['id']}/submit", headers={**headers, "Idempotency-Key": "summary-run"}
+    )
+    run_id = submitted.json()["run"]["id"]
+
+    listed = await ctx.client.get("/api/v1/runs", headers=headers)
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()
+    assert any(row["id"] == run_id for row in rows)
+    mine = next(row for row in rows if row["id"] == run_id)
+    assert mine["experiment_name"] == "摘要实验"
+    assert mine["status"] == "QUEUED"
+    assert mine["argv"] == ["python", "train.py"]
+    assert mine["parameters"] == {"epochs": 7}
+    assert mine["dataset_version_id"] == assets["dataset_version_id"]
+    assert mine["code_version_id"] == assets["code_version_id"]
+    assert mine["template_version_id"] == assets["template_version_id"]
+    assert mine["environment_version_id"] == assets["environment_version_id"]
+
+    single = await ctx.client.get(f"/api/v1/runs/{run_id}", headers=headers)
+    assert single.status_code == 200, single.text
+    assert single.json()["experiment_name"] == "摘要实验"
+
+    missing = await ctx.client.get("/api/v1/runs/00000000-0000-0000-0000-000000000000", headers=headers)
+    assert missing.status_code == 404

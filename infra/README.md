@@ -1,8 +1,33 @@
 # HydroLab 基础设施与 B9 部署基线
 
+## 2026-09-14 执行架构更新
+
+当前 Docker 模式由独立 `worker` 执行训练；API 仅自动发布 Outbox 并处理业务请求，不持有 Docker socket。`worker-control` 消费控制队列；正在运行的训练 Worker 从 MySQL 读取取消请求。工作区必须在宿主机与 Worker 内使用相同绝对路径，默认 `/srv/hydrolab/runs`。
+
+最新实现、验收边界和待办以 [交接清单](../plans/09-worker-outbox-handoff.md) 为准。下文旧的“API Docker adapter 执行训练”和“当前队列全为进程内状态”描述已被本次实现替代。数据库/真实 GPU 联合验收仍待服务器执行，已有 ACCEPTANCE 不能作为生产通过证明。
+
+不含真实凭据的离线 Compose 验证（项目根目录）：
+
+```bash
+HYDROLAB_ENV_FILE=.env.production.example docker compose --env-file infra/.env.production.example -f infra/docker-compose.production.yml config --quiet
+```
+
 ## 当前交付范围
 
-B9 已提供可部署编排骨架：PostgreSQL 16、Redis 7、MinIO、MLflow、API、静态 Web 与同源 `/api` 反向代理。生产 Compose **默认仍使用 Fake Adapter**，因为 S3、Celery、MLflow 与 Docker GPU Runner 的业务 Adapter 尚未在应用代码中实现；不得仅通过修改环境变量把它们标记为已启用。
+B9 提供可部署编排骨架：MySQL 8、Redis 7、MinIO、MLflow、API、Worker（Celery）、静态 Web 与同源 `/api` 反向代理。
+
+真实 Adapter（S3/MinIO、Celery/Redis、MLflow、Docker GPU Runner、MySQL 持久化）已实现并通过单测/契约测试。生产使用的是**显式选择真实后端**的配置模板（`.env.production.example` 默认指定 `mysql/s3/celery/mlflow/docker`），不再默认静默落到 fake；每个真实后端需在该服务器完成 Spike 验收后才算可用（见本章"状态分类"与 `apps/api/README.md`）。fake 仅作为本地开发 profile 或明确的回退模式。
+
+## 状态分类
+
+| 组件 | 状态 | 需要 |
+|---|---|---|
+| MySQL 持久化 | ✅ 已实现（SQL 仓储 + Alembic 迁移） | 服务器建库授权；`HYDROLAB_DATABASE_BACKEND=mysql` + URL |
+| S3/MinIO 对象存储 | ✅ 已实现（S3 契约测试通过） | MinIO 实例 + S3 凭证 |
+| Celery/Redis 队列 | ✅ 已实现（适配器 + Worker 幂等单测） | Redis 实例；启动 Worker 消费 |
+| MLflow 跟踪 | ✅ 已实现（接入 Run 生命周期） | MLflow 实例 |
+| Docker GPU Runner | 🟡 已实现适配器，需服务器真机验收 | Docker daemon + NVIDIA 驱动 + gpu runtime + 镜像白名单 |
+| 真实端到端（MySQL/S3/Redis/MLflow/Docker 联合） | 🟡 未在无 Docker/内网不可达环境验证 | 在有上述服务的服务器上做 Spike 验收 |
 
 ## Ubuntu 服务器前置条件
 
@@ -38,11 +63,11 @@ curl -f http://127.0.0.1:8080/api/v1/health
 sudo docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=100 api
 ```
 
-> API 的生产设置会拒绝默认密钥和缺失的管理员账号。当前 Fake Adapter 基线可用于页面和业务流程验收，但不能执行真实训练。
+> API 的生产设置会拒绝默认密钥和缺失的管理员账号。启用真实后端前，可用本地 `fake` profile 做页面与业务流程验收；真实训练需配置对应后端并运行 `scripts/verify-p0-deployment.sh` 检查。
 
 ## 真实执行链路（单机 subprocess Runner）
 
-Docker GPU Runner 尚未实现，但平台已提供**可真实执行训练并采集产物**的单机实现，用于在真实服务器上验证"数据 → 代码 → 实验 → 执行 → 结果"整条链路。
+Docker GPU Runner 适配器已实现，但真机容器执行需宿主机 GPU 条件（本章后文单独说明）。在本机/受控内网可用 **subprocess Runner** 真实执行训练并采集产物，用于验证"数据 → 代码 → 实验 → 执行 → 结果"整条链路：
 
 ```bash
 HYDROLAB_ENVIRONMENT=local                       # 生产环境会拒绝 subprocess
@@ -84,7 +109,7 @@ HYDROLAB_CODE_IMPORT_ROOTS=["/srv/projects"]         # 目录导入白名单
 - `POST /runs/{id}/start` 仍保留，便于单条手动调试；正常批量场景不必逐条调用；
 - Fake Runner 不启用自动调度，维持显式 `start/complete` 的测试与调试语义；
 - 当前队列/租约是进程内状态：**API 重启会丢失排队信息**，因此单机可用但尚非容错队列；
-  生产化前必须完成 Postgres 持久化与 Celery/Redis 队列适配。
+  生产化前必须完成 MySQL 持久化与 Celery/Redis 队列适配。
 
 链路语义：
 
@@ -107,17 +132,45 @@ uv run python ../../scripts/verify_da0_e2e.py --source /srv/projects/da0 --epoch
 它会把 `da0/datasets` 顶层数据文件打成 BUNDLE 上传并冻结为真实数据版本，
 因此即使不配 `HYDROLAB_RUNNER_DATA_ROOT` 也能跑通——这正是“选数据集就能跑”生效的证据。
 
-> **安全边界**：subprocess Runner 与 API 同主机同用户运行，**没有容器隔离**，因此 `validate_production()` 会在 `HYDROLAB_ENVIRONMENT=production` 时直接拒绝启动。它的定位是"Docker GPU Runner 落地前的可用实现"，只应在受控内网单机使用；对外多租户场景必须等下表的 Docker GPU 门禁通过。
+> **安全边界**：subprocess Runner 与 API 同主机同用户运行，**没有容器隔离**，因此 `validate_production()` 会在 `HYDROLAB_ENVIRONMENT=production` 时直接拒绝启动。它的定位是"Docker GPU Runner 真机验收前的可用实现"，只应在受控内网单机使用；对外多租户场景必须用 Docker GPU Runner。
 
-## 后续真实 Adapter 切换门禁
+## 真实 Adapter 门禁（已实现 / 待真机验收）
 
-| 组件 | 必须完成的实现与验收 | 才能切换 |
+| 组件 | 现状 | 启用 |
 |---|---|---|
-| S3 | `S3ObjectStorageAdapter`，上传/下载/签名 URL/权限 Spike | `OBJECT_STORAGE_BACKEND=s3` |
-| Celery | Outbox publisher、幂等 worker、重试/死信/恢复 Spike | `TASK_QUEUE_BACKEND=celery` |
-| MLflow | Tracking Adapter、Run/metric/artifact 关联 Spike | `EXPERIMENT_TRACKER_BACKEND=mlflow` |
-| Docker GPU | 签名 RunSpec、只读挂载、网络/权限/超时/清理与双 4090 压测 | `RUN_EXECUTOR_BACKEND=docker` + `--profile gpu` |
+| S3/MinIO | ✅ Adapter 与契约测试已实现 | `OBJECT_STORAGE_BACKEND=s3` + endpoint/凭证 |
+| Celery | ✅ Adapter + Worker 幂等已实现 | `TASK_QUEUE_BACKEND=celery` + Redis；启动 Worker |
+| MLflow | ✅ Adapter 已接入 Run 生命周期 | `EXPERIMENT_TRACKER_BACKEND=mlflow` + URI |
+| Docker GPU | 🟡 Adapter 已实现，真机容器执行待验收 | `RUN_EXECUTOR_BACKEND=docker` + 镜像白名单 + GPU 条件 |
 
-其中 Docker GPU 一行是**多租户/生产**的目标形态；单机受控场景可先用上文的 subprocess Runner 真实跑通链路。
+`docker-compose.production.yml` 不再提供指向占位镜像的 `runner` 服务；GPU 训练由 API 的 Docker adapter 承担。启用 GPU 需宿主机 NVIDIA 驱动与 gpu runtime（见部署前检查脚本）。
 
-在以上门禁通过前，`runner` 服务始终保持未启用状态。
+## 从零部署 / 启动 / 验收
+
+```bash
+# 1) 部署前检查（静态，不修改数据，不输出秘密）
+./scripts/verify-p0-deployment.sh --env-file infra/.env.production.example --no-docker
+
+# 2) 准备生产配置
+cd infra
+cp .env.production.example .env.production
+# 填写所有 replace-with-* 占位符；替换真实域名与镜像 digest
+
+# 3) 构建并启动（API + Worker + MySQL + Redis + MinIO + MLflow + Web）
+sudo docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+sudo docker compose --env-file .env.production -f docker-compose.production.yml ps
+
+# 4) 健康检查
+curl -f http://127.0.0.1:8080/health/live
+curl -f http://127.0.0.1:8080/api/v1/health/ready
+
+# 5) 提交一次小型训练并查看结果
+#    前端:  http://127.0.0.1:8080   （登录后走 数据集→代码→实验→提交→结果）
+#    curl:  用 /api/v1/experiment-drafts 提交；随后观察 /runs/{id}/events、/result/ingest
+
+# 6) 停止
+sudo docker compose --env-file .env.production -f docker-compose.production.yml stop
+```
+
+> 命令中的秘密一律用 `replace-with-*` 占位符；不要提交真实密码/Token。
+> 验收记录见 `infra/ACCEPTANCE.md`。

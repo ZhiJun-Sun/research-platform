@@ -26,7 +26,7 @@
 <!-- anchor:ownership-boundary -->
 ## 2. 不可外包的业务边界
 
-以下能力必须由 HydroLab PostgreSQL、领域服务和 Policy 维护，任何开源组件都不得成为业务真相源：
+以下能力必须由 HydroLab MySQL、领域服务和 Policy 维护，任何开源组件都不得成为业务真相源：
 
 - User、Invitation、Session、ResourceGrant、ShareLink 与审计。
 - DatasetVersion、CodeVersion、TemplateVersion、EnvironmentVersion 的不可变语义。
@@ -124,7 +124,7 @@ AWS 官方文档确认 boto3 支持有时效的预签名下载和预签名上传
 ### 4.3 不委托能力
 
 - 资源授权不能等同 bucket policy；先过 HydroLab Policy 才能签名。
-- `DatasetVersion`、Artifact READY 状态、sha256、manifest 和血缘仍在 PostgreSQL。
+- `DatasetVersion`、Artifact READY 状态、sha256、manifest 和血缘仍在 MySQL。
 - 分享链接不能直接暴露永久对象 URL。
 
 ### 4.4 Spike S3-01
@@ -201,7 +201,7 @@ Checkpoint                 → MLflow model/checkpoint metadata + HydroLab check
 
 ### 6.3 边界
 
-- PostgreSQL 是 Run、权限、版本和 Artifact 索引真相源。
+- MySQL 是 Run、权限、版本和 Artifact 索引真相源。
 - MLflow 故障不得把已成功训练改成 FAILED；同步记录独立状态并可重放。
 - Web 前端不直接调用 MLflow；所有查询通过 HydroLab API 和 Policy。
 - 不把 MLflow Experiment 等同 HydroLab Experiment。
@@ -296,7 +296,7 @@ OptimizationStudy
 
 Optuna 不拥有 Run、GPU、权限、Artifact 或取消。Study 与 Trial 映射必须存入 HydroLab 数据库，外部 storage 只是优化器状态。
 
-Spike OPT-01：PostgreSQL 持久化、多 worker ask/tell、worker 丢失、heartbeat、重复 tell、剪枝竞态、Study 恢复和参数 Schema 映射。
+Spike OPT-01：MySQL 持久化、多 worker ask/tell、worker 丢失、heartbeat、重复 tell、剪枝竞态、Study 恢复和参数 Schema 映射。
 
 回退：平台继续支持用户手动创建多 Run 对比；不影响 MVP。
 
@@ -356,7 +356,7 @@ Spike DVC-01 只有出现真实用户需求才启动；CLI 隔离优先于不稳
 - HydroLab `GpuLease`、权限、优先级和取消审计。
 - Run 状态、Outbox 与 Artifact 一致性。
 
-当前采用 PostgreSQL `GpuLease` + Runner Controller 更简单。重评条件为多节点、分布式训练、Actor 服务或动态集群调度。Spike RAY-01 必须与现有 Runner 在故障恢复、显存隔离、容器集成和运维复杂度上量化对比。
+当前采用 MySQL `GpuLease` + Runner Controller 更简单。重评条件为多节点、分布式训练、Actor 服务或动态集群调度。Spike RAY-01 必须与现有 Runner 在故障恢复、显存隔离、容器集成和运维复杂度上量化对比。
 
 <!-- anchor:compatibility -->
 ## 14. 许可、维护与版本治理

@@ -4,7 +4,7 @@
 
 ## 设计原则
 
-- **代码优先**：默认全 Fake 适配器，无需 PostgreSQL/Redis/S3/MLflow/GPU 即可开发与测试；
+- **代码优先**：默认全 Fake 适配器，无需 MySQL/Redis/S3/MLflow/GPU 即可开发与测试；
 - **端口隔离**：领域服务只依赖 `hydrolab.ports` 的 Protocol，第三方 SDK 只能出现在 `hydrolab.adapters`；
 - **业务真相自有**：Run 状态机、权限、不可变版本、GPU 租约由本平台维护，外部系统状态不得反向覆盖。
 
@@ -24,7 +24,7 @@ src/hydrolab/
 tests/
 ├── contracts/  # 端口契约测试：Fake/Local/未来真实实现共用
 └── ...         # HTTP 层与错误模型测试
-alembic/        # 迁移骨架（真实 PostgreSQL 接入后启用）
+alembic/        # 迁移链（database_backend=mysql 时启动自动执行）
 ```
 
 ## 快速开始
@@ -44,10 +44,34 @@ uv run uvicorn hydrolab.main:app --reload
 - `GET /health/ready` — 按启用的后端逐组件报告（Fake 模式如实标注 backend=fake）；
 - `GET /openapi.json` — REST 契约唯一来源。
 
+## 数据库接入（MySQL）
+
+默认 `HYDROLAB_DATABASE_BACKEND=memory`（无库开发/测试）。启用真实 MySQL：
+
+```bash
+export HYDROLAB_DATABASE_BACKEND=mysql
+export HYDROLAB_DATABASE_URL='mysql+asyncmy://USER:PASS@HOST:3306/hydrolab?charset=utf8mb4'
+uv run uvicorn hydrolab.main:app --reload
+```
+
+启动时会自动执行 Alembic 迁移到 head（只新增表/约束，不做任何删除）。迁移链：
+`0001_baseline` → `4e409406eb80`（36 张业务表）→ `b32a91f9c7d4`（46 个外键 + runs 幂等唯一约束 + gpu_leases.gpu_index 唯一约束）。
+
+### 真实 MySQL 集成测试
+
+配置 `HYDROLAB_TEST_DATABASE_URL` 指向一个独立测试库后，会额外运行 `tests/db/` 集成测试：
+迁移升级幂等、离线降级 SQL、表/外键/唯一约束断言、SQL 仓储与外键/幂等约束生效验证。未配置时自动跳过。
+
+```bash
+# 测试库必须是独立库；测试只做新增（建表/插入），绝不删除数据库或表。
+export HYDROLAB_TEST_DATABASE_URL='mysql+pymysql://USER:PASS@HOST:3306/hydrolab_test?charset=utf8mb4'
+uv run pytest tests/db -v
+```
+
 ## B1 已实现：身份、邀请、授权与分享
 
-数据存储为 **InMemory Repository**（进程重启即清空，专供无数据库联调）；
-部署时仅替换 `hydrolab/api/container.py` 中的构造实现为 SQL 版本，服务与路由不变。
+数据存储默认为 **InMemory Repository**（进程重启即清空，专供无数据库联调）；
+设置 `HYDROLAB_DATABASE_BACKEND=mysql` 后自动切换到 `hydrolab/db` 下的 SQL 实现（B1–B8 全部仓储），服务与路由不变。
 
 本地联调账号（首次启动自动 bootstrap）：`admin@hydrolab.cn` / `admin123456`。
 
@@ -168,5 +192,7 @@ POST /api/v1/checkpoints/{id}/compatibility
 
 ## 切换到真实服务
 
-按 `plans/05` 的 Spike 门禁逐个启用（见 `infra/README.md` 与 `.env.example`）。
-选择未实现的真实后端会得到明确的 `DEPENDENCY_UNAVAILABLE`，不会静默降级。
+真实 Adapter（MySQL 存储、S3/MinIO 对象存储、Celery/Redis 队列、MLflow 跟踪、Docker GPU Runner）已实现并通过单测/契约测试。逐个启用需在 `plans/05` Spike 门禁通过后于对应服务器完成验收（见 `infra/README.md` 与 `.env.example`）：
+- 缺配置时返回明确的 `AppError`（如 S3 缺 endpoint、Docker 缺镜像白名单），不泄露 Secret、不静默降级。
+- 默认 `database_backend=memory`、全 Fake，本地启动绝不连接外部服务。
+- 真实后端通过环境变量显式启用（`HYDROLAB_*_BACKEND` 与对应连接/凭证）。

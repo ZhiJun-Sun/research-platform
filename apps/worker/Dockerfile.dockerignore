@@ -1,0 +1,17 @@
+# Worker 的构建上下文为 apps/，仅发送镜像需要的源码与配置。
+**
+!api/
+!api/pyproject.toml
+!api/uv.lock
+!api/src/
+!api/src/**
+!api/alembic.ini
+!api/alembic/
+!api/alembic/**
+!worker/
+!worker/Dockerfile
+!worker/Dockerfile.dockerignore
+!worker/src/
+!worker/src/**
+**/__pycache__/
+**/*.pyc

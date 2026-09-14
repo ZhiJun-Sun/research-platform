@@ -78,6 +78,8 @@ def extract_archive(archive: bytes, target: Path) -> list[str]:
 class SubprocessRunExecutor:
     """真实子进程执行器。"""
 
+    real_executor = True  # 显式能力标记：真实执行训练进程
+
     def __init__(
         self,
         workspace_root: Path,

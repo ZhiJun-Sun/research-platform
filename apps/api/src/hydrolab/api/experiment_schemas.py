@@ -91,3 +91,20 @@ class RunStageView(BaseModel):
     name: str
     position: int
     status: RunStatus
+
+
+class RunSummaryView(BaseModel):
+    """Run 摘要：供运行中心/详情页使用，附带实验名与冻结配置中的关键引用。"""
+
+    id: UUID
+    experiment_id: UUID
+    experiment_name: str
+    experiment_version_id: UUID
+    status: RunStatus
+    argv: list[str] = Field(default_factory=list)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    dataset_version_id: str | None = None
+    code_version_id: str | None = None
+    template_version_id: str | None = None
+    environment_version_id: str | None = None
+    created_at: Any = None

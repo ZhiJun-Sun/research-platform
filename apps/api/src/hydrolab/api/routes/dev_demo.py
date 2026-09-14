@@ -163,7 +163,7 @@ async def seed(request: Request, user: User = Depends(get_current_user)) -> dict
         user, "env-v3 · PyTorch 2.4", "联调环境"
     )
     environment_version = await request.app.state.template_environment_service.create_environment_version(
-        user, environment.id, "python:3.11@sha256:demo", "3.11", None, None
+        user, environment.id, f"python:3.11@sha256:{'a' * 64}", "3.11", None, None
     )
     draft = await request.app.state.experiment_service.create_draft(user, "Top-30 相似流域微调", "前后端联调实验")
     await request.app.state.experiment_service.update_draft(

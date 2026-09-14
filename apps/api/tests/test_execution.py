@@ -35,6 +35,18 @@ async def test_fake_runner_lifecycle_releases_dual_gpu_leases(ctx: TestContext) 
     assert not ctx.app.state.gpu_leases.items
 
 
+async def test_outbox_dispatch_is_idempotent_after_publish(ctx: TestContext) -> None:
+    headers, _ = await _queued_run(ctx)
+    first = await ctx.client.post("/api/v1/internal/outbox/dispatch", headers=headers)
+    second = await ctx.client.post("/api/v1/internal/outbox/dispatch", headers=headers)
+
+    assert first.json() == {"dispatched": 1}
+    assert second.json() == {"dispatched": 0}
+    event = next(iter(ctx.app.state.outbox.items.values()))
+    assert event.status.value == "PUBLISHED"
+    assert event.published_at is not None
+
+
 async def test_fake_runner_rejects_contention_and_cancel_releases_lease(ctx: TestContext) -> None:
     headers, first_run = await _queued_run(ctx)
     _, second_run = await _queued_run(ctx)

@@ -19,6 +19,10 @@
 | 03 | `03-backend-implementation-roadmap.md` | Confirmed | 指导后端目录、依赖、实施批次、测试与上线 |
 | 04 | `04-prototype-backend-traceability.md` | Confirmed | 将原型页面逐项映射到后端实体、接口和异步事件 |
 | 05 | `05-open-source-reuse-and-adapter-plan.md` | Confirmed | 定义开源准入决策、领域端口、Adapter、Spike 与回退策略 |
+| 06 | `06-subproject-backend-runtime-and-production-readiness.md` | In Progress | 后端运行时、真实 Adapter、持久化与生产门禁子工程任务书 |
+| 07 | `07-subproject-frontend-quality-and-e2e.md` | In Progress | 前端真实联调、质量收口与端到端验收子工程任务书 |
+| 08 | `08-p0-parallel-deployment-and-acceptance.md` | In Progress | P0 生产部署封装、Worker、Compose 与部署前验收工具子工程任务书 |
+| 09 | `09-worker-outbox-handoff.md` | In Progress | 自动 Outbox、独立 Worker 实现记录及数据库/运行时/部署三个后续工作包 |
 
 ## 3. 状态规则
 
@@ -58,7 +62,7 @@ Draft → Confirmed → In Progress → Completed
 
 - FastAPI 只负责业务 API、鉴权、校验和任务编排，不直接执行用户训练命令。
 - 所有训练、评估、预测、绘图命令由队列投递至隔离 Runner。
-- PostgreSQL 保存业务元数据与不可变引用；S3-compatible object storage 保存大文件；MLflow 保存训练跟踪；Redis/Celery 负责任务投递。
+- MySQL 保存业务元数据与不可变引用；S3-compatible object storage 保存大文件；MLflow 保存训练跟踪；Redis/Celery 负责任务投递。
 - 业务代码只依赖 `05` 定义的领域端口；先实现 Fake/Local Adapter，再由 Spike 准入真实服务。
 - 外部组件状态和 ID 只用于关联与观测，不得成为 HydroLab 业务真相源。
 - Experiment 是可复用配置定义，Run 是一次实际执行。

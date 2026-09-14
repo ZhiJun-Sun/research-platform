@@ -14,10 +14,12 @@ from hydrolab.api.experiment_schemas import (
     ExperimentVersionView,
     ExperimentView,
     RunStageView,
+    RunSummaryView,
     RunView,
     SubmitResponse,
 )
 from hydrolab.auth.dependencies import get_current_user
+from hydrolab.core.errors import not_found
 from hydrolab.domain.entities import User
 from hydrolab.experiments.entities import Experiment, ExperimentDraft, ExperimentVersion, Run, RunStage
 
@@ -49,6 +51,43 @@ def _run(item: Run) -> RunView:
 
 def _stage(item: RunStage) -> RunStageView:
     return RunStageView(name=item.name, position=item.position, status=item.status)
+
+
+async def _summary(request: Request, item: Run) -> RunSummaryView:
+    """把 Run 展开为附带实验名与冻结配置引用的摘要。"""
+    experiment = await request.app.state.experiments.get(item.experiment_id)
+    version = await request.app.state.experiment_versions.get(item.experiment_version_id)
+    config = version.resolved_config if version is not None else {}
+    return RunSummaryView(
+        id=item.id,
+        experiment_id=item.experiment_id,
+        experiment_name=experiment.name if experiment is not None else item.experiment_id.hex[:8],
+        experiment_version_id=item.experiment_version_id,
+        status=item.status,
+        argv=list(config.get("argv") or []),
+        parameters=dict(config.get("parameters") or {}),
+        dataset_version_id=config.get("dataset_version_id"),
+        code_version_id=config.get("code_version_id"),
+        template_version_id=config.get("template_version_id"),
+        environment_version_id=config.get("environment_version_id"),
+        created_at=item.created_at,
+    )
+
+
+@router.get("/runs", response_model=list[RunSummaryView])
+async def list_my_runs(request: Request, user: User = Depends(get_current_user)) -> list[RunSummaryView]:
+    """当前用户全部 Run（按提交时间倒序），运行中心与详情共用。"""
+    return [await _summary(request, run) for run in await request.app.state.runs.list_by_owner(user.id)]
+
+
+@router.get("/runs/{run_id}", response_model=RunSummaryView)
+async def get_my_run(
+    run_id: UUID, request: Request, user: User = Depends(get_current_user)
+) -> RunSummaryView:
+    run = await request.app.state.runs.get(run_id)
+    if run is None or run.owner_id != user.id:
+        raise not_found("Run 不存在")
+    return await _summary(request, run)
 
 
 @router.get("/experiment-drafts", response_model=list[DraftView])

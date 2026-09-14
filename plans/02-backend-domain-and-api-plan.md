@@ -1,7 +1,7 @@
 # HydroLab 后端领域与 API 实施计划
 
 > 状态：Confirmed  
-> 架构：FastAPI + PostgreSQL + Redis/Celery + S3-compatible storage + MLflow + Docker Runner  
+> 架构：FastAPI + MySQL + Redis/Celery + S3-compatible storage + MLflow + Docker Runner  
 > 原则：契约由定版原型倒推，API 层不直接执行训练命令；业务服务仅依赖 `05` 定义的领域端口。
 
 ## 1. 服务边界
@@ -12,7 +12,7 @@
 React Web
    │ REST + SSE
 FastAPI
-   ├── PostgreSQL：身份、权限、资源版本、任务、索引和血缘
+   ├── MySQL：身份、权限、资源版本、任务、索引和血缘
    ├── TaskQueue Port：Fake → Celery/Redis Adapter
    ├── ObjectStorage Port：Fake/Local → S3 Adapter（MinIO 或兼容服务）
    ├── ExperimentTracker Port：Fake/Noop → MLflow Adapter
@@ -341,7 +341,7 @@ Artifact 先为 `PENDING_UPLOAD`，上传完成后校验 sha256/size，再进入
 
 ### 8.3 MLflow
 
-PostgreSQL 是业务真相源；MLflow 是 `ExperimentTracker` 的可替换实现。Run 保存 `mlflow_run_id`，同步失败可重试，不让 MLflow 状态反向覆盖业务状态。Adapter 禁用时使用 Fake/Noop，核心 Run 链路仍可执行。
+MySQL 是业务真相源；MLflow 是 `ExperimentTracker` 的可替换实现。Run 保存 `mlflow_run_id`，同步失败可重试，不让 MLflow 状态反向覆盖业务状态。Adapter 禁用时使用 Fake/Noop，核心 Run 链路仍可执行。
 
 ### 8.4 Celery 与消息投递
 

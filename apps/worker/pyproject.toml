@@ -3,7 +3,10 @@ name = "hydrolab-worker"
 version = "0.1.0"
 description = "HydroLab 异步任务 Worker（导入/解析/绘图/导出/MLflow 同步）"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "celery>=5.4,<6.0",
+    "redis>=5.0,<6.0",
+]
 
 [build-system]
 requires = ["hatchling"]

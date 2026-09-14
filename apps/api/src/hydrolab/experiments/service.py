@@ -5,6 +5,8 @@ import json
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
+
 from hydrolab.access.policy import AccessPolicy
 from hydrolab.code_assets.entities import ParameterDefinition
 from hydrolab.code_assets.enums import CodeVersionStatus, EnvironmentStatus, ParameterType
@@ -42,12 +44,16 @@ class ExperimentService:
         environment_versions: EnvironmentVersionStore,
         grants: GrantRepository,
         policy: AccessPolicy,
+        transaction_factory: Any | None = None,
     ) -> None:
         self._drafts, self._experiments, self._versions, self._runs = drafts, experiments, versions, runs
         self._stages, self._outbox = stages, outbox
         self._datasets, self._code_versions = datasets, code_versions
         self._template_versions, self._environment_versions = template_versions, environment_versions
         self._grants, self._policy = grants, policy
+        # 事务工厂：SQL 模式注入可异步进入的 UnitOfWork 工厂，使 submit 一次
+        # 提交全部原子落地；memory 模式为 None，走原「各自提交」路径。
+        self._tx = transaction_factory
 
     async def create_draft(self, owner: User, name: str, description: str = "") -> ExperimentDraft:
         if not name.strip():
@@ -84,14 +90,40 @@ class ExperimentService:
         if idempotency_key:
             existing = await self._runs.get_by_idempotency(owner.id, idempotency_key)
             if existing:
-                experiment = await self._experiments.get(existing.experiment_id)
-                version = await self._versions.get(existing.experiment_version_id)
-                if experiment is None or version is None:
-                    raise conflict("幂等 Run 的关联记录不完整")
-                return experiment, version, existing
+                return await self._resolve_existing(existing)
         if draft.status != DraftStatus.ACTIVE:
             raise conflict("草稿已提交；请创建新草稿后再次提交")
         config = await self._resolve_config(owner, draft)
+        try:
+            return await self._submit_in_tx(owner, draft, config, idempotency_key)
+        except IntegrityError as exc:
+            # 并发提交：另一方在本事务提交前已用同一幂等键先落库（唯一约束），
+            # 本事务整体回滚，不会残留多余 Experiment/Version。回读胜者的 Run。
+            if not idempotency_key:
+                raise conflict("并发提交冲突，请重试") from None
+            winner = await self._runs.get_by_idempotency(owner.id, idempotency_key)
+            if winner is None:
+                raise exc
+            return await self._resolve_existing(winner)
+
+    async def _resolve_existing(self, existing: Run) -> tuple[Experiment, ExperimentVersion, Run]:
+        experiment = await self._experiments.get(existing.experiment_id)
+        version = await self._versions.get(existing.experiment_version_id)
+        if experiment is None or version is None:
+            raise conflict("幂等 Run 的关联记录不完整")
+        return experiment, version, existing
+
+    async def _submit_in_tx(
+        self, owner: User, draft: ExperimentDraft, config: dict[str, Any], idempotency_key: str | None
+    ) -> tuple[Experiment, ExperimentVersion, Run]:
+        if self._tx is None:
+            return await self._do_submit(owner, draft, config, idempotency_key)
+        async with self._tx() as _uow:
+            return await self._do_submit(owner, draft, config, idempotency_key)
+
+    async def _do_submit(
+        self, owner: User, draft: ExperimentDraft, config: dict[str, Any], idempotency_key: str | None
+    ) -> tuple[Experiment, ExperimentVersion, Run]:
         experiment = await self._experiments.add(
             Experiment(owner_id=owner.id, name=draft.name, description=draft.description)
         )
@@ -185,40 +217,9 @@ class ExperimentService:
 
         items: list[dict[str, Any]] = []
         for draft, config, name in prepared:
-            experiment = await self._experiments.add(
-                Experiment(owner_id=owner.id, name=name, description=description)
-            )
-            await self._grants.add(
-                ResourceGrant(
-                    resource_type=ResourceType.EXPERIMENT,
-                    resource_id=experiment.id,
-                    subject_id=owner.id,
-                    role=Role.OWNER,
-                    granted_by=owner.id,
-                )
-            )
-            encoded = json.dumps(config, sort_keys=True, separators=(",", ":"))
-            version = await self._versions.add(
-                ExperimentVersion(
-                    experiment_id=experiment.id,
-                    version_no=1,
-                    resolved_config=config,
-                    config_hash=hashlib.sha256(encoded.encode()).hexdigest(),
-                )
-            )
-            run = await self._runs.add(
-                Run(experiment_id=experiment.id, experiment_version_id=version.id, owner_id=owner.id)
-            )
-            for position, stage_name in enumerate(RunStageName):
-                await self._stages.add(RunStage(run_id=run.id, name=stage_name, position=position))
-            await self._outbox.add(
-                OutboxEvent(
-                    aggregate_type="RUN",
-                    aggregate_id=run.id,
-                    topic="run.requested",
-                    payload={"run_id": str(run.id), "experiment_version_id": str(version.id)},
-                )
-            )
+            # 逐项事务语义：每一条批量 Run 的 Experiment/Version/Run/Stages/Outbox
+            # 在一个事务内原子提交，避免中途失败留下半成品。
+            _experiment, _version, run = await self._submit_in_tx(owner, draft, config, None)
             items.append(
                 {
                     "dataset_version_id": draft.dataset_version_id,
@@ -283,6 +284,7 @@ class ExperimentService:
             "argv": template.argv,
             "environment_version_id": str(environment.id),
             "environment_content_hash": environment.content_hash,
+            "environment_image_digest": environment.image_digest,
             "parameters": values,
         }
 

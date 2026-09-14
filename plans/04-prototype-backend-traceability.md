@@ -143,14 +143,14 @@
 
 | 原型能力 | HydroLab 端口 | 首选实现 | 真相源边界 | 准入门禁 |
 |---|---|---|---|---|
-| 上传、下载、Artifact | ObjectStorage | S3ObjectStorageAdapter | Artifact/权限/manifest 在 PostgreSQL | S3-01 |
-| 导入、构建、执行、绘图队列 | TaskQueue | CeleryTaskQueueAdapter | Job/Run 状态在 PostgreSQL | QUEUE-01 |
-| 训练参数与指标跟踪 | ExperimentTracker | MlflowTrackingAdapter | Run/权限/结果索引在 PostgreSQL | TRACK-01 |
+| 上传、下载、Artifact | ObjectStorage | S3ObjectStorageAdapter | Artifact/权限/manifest 在 MySQL | S3-01 |
+| 导入、构建、执行、绘图队列 | TaskQueue | CeleryTaskQueueAdapter | Job/Run 状态在 MySQL | QUEUE-01 |
+| 训练参数与指标跟踪 | ExperimentTracker | MlflowTrackingAdapter | Run/权限/结果索引在 MySQL | TRACK-01 |
 | 水文训练与评估 | ModelFrameworkAdapter | NeuralHydrologyAdapter | GPU lease/状态/兼容性由 HydroLab 管理 | NH-01 |
 | 通用时序模型 | ModelFrameworkAdapter | DartsAdapter | MVP 不启用 | DARTS-01 |
 | 超参数搜索 | OptimizationAdapter | OptunaAdapter | Optuna 不创建或调度 Run | OPT-01 |
 | 外部数据版本桥 | ImportSourceAdapter | DVC CLI bridge | DatasetVersion 不委托 DVC | DVC-01 |
-| 双 GPU 调度 | RunExecutor + GpuLease | PostgreSQL lease + Docker Runner | 不采用 Ray/ClearML/Kubeflow 状态 | Runner Spike |
+| 双 GPU 调度 | RunExecutor + GpuLease | MySQL lease + Docker Runner | 不采用 Ray/ClearML/Kubeflow 状态 | Runner Spike |
 
 ClearML 仅参考 Agent/Queue 设计；Kubeflow 当前拒绝；Ray 在多节点前延后。任何决策变化先更新 `05`。
 

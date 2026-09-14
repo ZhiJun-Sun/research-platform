@@ -12,7 +12,7 @@
 - [x] Python 与包管理：系统 Python 3.9 不满足要求，使用 uv 自动管理 Python ≥3.11；依赖已在 `apps/api/pyproject.toml` 声明并通过 `uv sync` 锁定。
 - [x] 项目已在无 Docker、数据库、Redis、对象存储、MLflow 和 GPU 的环境运行 Fake/Local 单元与契约测试（43 项通过，ruff/mypy 全绿）。
 - [ ] Docker Engine、Compose v2、磁盘和可用端口仅作为后续真实 Adapter/部署验收项，不阻塞 B1。
-- [ ] PostgreSQL、Redis、S3-compatible storage、MLflow 版本兼容性在对应 Spike 后记录。
+- [ ] MySQL、Redis、S3-compatible storage、MLflow 版本兼容性在对应 Spike 后记录。
 - [ ] Ubuntu 服务器 NVIDIA Driver、两张 RTX 4090、NVIDIA Container Toolkit、CUDA 镜像标记为云端验收项。
 - [x] 当前无 GPU/基础设施，真实集成标记为待验收，不阻塞 API、领域和 Fake Adapter 开发。
 - [ ] 备份目录、对象存储容量和低水位阈值。
@@ -24,7 +24,7 @@
 建议锁定而非使用 latest：
 
 - API 核心：FastAPI、Pydantic v2、SQLAlchemy 2 async、Alembic；Python 精确版本由首批依赖 Spike 后固定。
-- 生产目标：PostgreSQL 16、Redis 7、Celery 5.6 系列、S3-compatible storage、MLflow 3 系列；均须通过 `05` 对应 Spike，不能因当前不可访问而阻塞编码。
+- 生产目标：MySQL 16、Redis 7、Celery 5.6 系列、S3-compatible storage、MLflow 3 系列；均须通过 `05` 对应 Spike，不能因当前不可访问而阻塞编码。
 - 首批可执行基线：Fake/Local adapters、pytest、pytest-asyncio、httpx、ruff、mypy/pyright。
 - 真实集成测试阶段再加入 testcontainers、Docker、boto3、Celery、MLflow client。
 - structlog 或标准 JSON logging；OpenTelemetry + Prometheus 指标。
@@ -65,9 +65,9 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 - 建立 `apps/api`、`apps/worker`、`apps/runner`、`infra`、`packages/contracts`。
 - FastAPI 生命周期、配置、JSON 日志、request_id、统一错误模型。
 - 定义 ObjectStorage、TaskQueue、ExperimentTracker、RunExecutor、ModelFrameworkAdapter 端口及 DTO。
-- 实现 Fake/Noop/Local adapters、故障注入和共享 contract tests；不要求启动 PostgreSQL、Redis、S3、MLflow 或 GPU。
+- 实现 Fake/Noop/Local adapters、故障注入和共享 contract tests；不要求启动 MySQL、Redis、S3、MLflow 或 GPU。
 - `/health/live`、按启用 Adapter 计算的 `/health/ready`。
-- Alembic 基线和空数据库升级/降级测试；无 PostgreSQL 时先完成迁移静态检查与 Repository 单测。
+- Alembic 基线和空数据库升级/降级测试；无 MySQL 时先完成迁移静态检查与 Repository 单测。
 - CI：lint、typecheck、unit、contract、migration、OpenAPI diff。
 
 **验收**
@@ -80,7 +80,7 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### B1：身份、邀请、资源授权与分享基础
 
-> 状态：已完成（InMemory 基线，66 项测试通过；SQL Repository 与 Alembic 迁移随首个真实数据库环境接入）
+> 状态：已完成（InMemory 基线，66 项测试通过；SQL Repository（MySQL）与 Alembic 迁移已实现，待真实库联调验收）
 
 **实现**
 
@@ -98,7 +98,7 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### B2：文件夹、数据导入与不可变版本
 
-> 状态：已完成（InMemory + Fake/Local ObjectStorage 基线，71 项测试通过；S3 直传、URL SSRF 安全下载、Parquet/NetCDF 深度探测与 SQL Repository 随对应 Spike/真实环境接入）
+> 状态：已完成（InMemory + Fake/Local ObjectStorage 基线，71 项测试通过；S3 直传、URL SSRF 安全下载、Parquet/NetCDF 深度探测待对应 Spike；SQL Repository（MySQL）已实现）
 
 **实现**
 
@@ -118,7 +118,7 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### B3：代码、模板与环境资产
 
-> 状态：已完成（InMemory + Fake/Local ObjectStorage 基线，75 项测试通过；Git clone、异步镜像构建、代码安全扫描与 SQL Repository 随隔离 Worker/真实环境接入）
+> 状态：已完成（InMemory + Fake/Local ObjectStorage 基线，75 项测试通过；Git clone、异步镜像构建、代码安全扫描待隔离 Worker；SQL Repository（MySQL）已实现）
 
 **实现**
 
@@ -138,7 +138,7 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### B4：Experiment、草稿与 Run 元数据
 
-> 状态：已完成（InMemory + Fake Outbox 基线，78 项测试通过；SQL 事务性 Outbox、Celery 投递与真实 Runner 在 B5/真实基础设施阶段接入）
+> 状态：已完成（InMemory + Fake Outbox 基线，78 项测试通过；SQL 事务性 Outbox 与 Celery 投递、真实 Runner 在 B5/真实基础设施阶段接入）
 
 **实现**
 
@@ -283,7 +283,7 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 
 ### 集成测试
 
-先对 Fake/Local 实现运行共享 contract tests；获得服务环境后，再使用隔离 PostgreSQL/Redis/S3-compatible storage 覆盖导入两阶段提交、Outbox、分享、SSE 恢复和 Artifact 授权。真实 Adapter 不通过对应 Spike 不进入默认路径。
+先对 Fake/Local 实现运行共享 contract tests；获得服务环境后，再使用隔离 MySQL/Redis/S3-compatible storage 覆盖导入两阶段提交、Outbox、分享、SSE 恢复和 Artifact 授权。真实 Adapter 不通过对应 Spike 不进入默认路径。
 
 ### Runner 安全测试
 
@@ -312,7 +312,7 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 ## 8. 迁移、备份与回滚
 
 - 每个 schema 变化配 Alembic upgrade/downgrade；破坏性迁移采用 expand/migrate/contract。
-- 发布前备份 PostgreSQL 和 MinIO manifest；数据库备份与对象快照使用一致时间点标记。
+- 发布前备份 MySQL 和 MinIO manifest；数据库备份与对象快照使用一致时间点标记。
 - 回滚应用不自动回滚已写数据，使用兼容窗口和明确 runbook。
 - Runtime Image、模板 Schema、Progress Event 和 PlotSpec 均显式版本化。
 
@@ -355,6 +355,6 @@ STORAGE_QUOTA_BYTES / STORAGE_LOW_WATERMARK_BYTES
 6. 建立 Alembic 基线；真实数据库验收可后补。
 7. 最小 CI/测试与启动文档。
 
-Compose、PostgreSQL、Redis、S3、MLflow、Docker GPU Runner 均不是首次 Coding 会话前置条件。需要真实接入时，按 `05` 的 S3-01、QUEUE-01、TRACK-01、NH-01 门禁逐项启用。
+Compose、MySQL、Redis、S3、MLflow、Docker GPU Runner 均不是首次 Coding 会话前置条件。需要真实接入时，按 `05` 的 S3-01、QUEUE-01、TRACK-01、NH-01 门禁逐项启用。
 
 B0 代码基线验收后再进入 B1，避免同时引入认证、数据上传和 Runner 导致故障难定位。

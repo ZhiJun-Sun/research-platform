@@ -8,10 +8,20 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from hydrolab.auth.dependencies import get_current_user
+from hydrolab.auth.dependencies import get_current_user, require_admin
+from hydrolab.core.errors import forbidden, not_found
 from hydrolab.domain.entities import User
 
 router = APIRouter(tags=["run-execution"])
+
+
+async def _require_owner(request: Request, user: User, run_id: UUID) -> None:
+    """观测与控制接口的统一资源权限：仅 Run 所有者或管理员可访问。"""
+    run = await request.app.state.runs.get(run_id)
+    if run is None:
+        raise not_found("Run 不存在")
+    if run.owner_id != user.id and not user.is_admin:
+        raise forbidden("仅 Run 所有者或管理员可访问")
 
 
 class StartRequest(BaseModel):
@@ -42,23 +52,25 @@ class ResourceRequest(BaseModel):
 
 
 @router.post("/internal/outbox/dispatch")
-async def dispatch(request: Request, user: User = Depends(get_current_user)) -> dict[str, int]:
+async def dispatch(request: Request, user: User = Depends(require_admin)) -> dict[str, int]:
     return {"dispatched": await request.app.state.run_control_service.dispatch_pending()}
 
 
 @router.post("/runs/{run_id}/start")
 async def start(run_id: UUID, body: StartRequest, request: Request, user: User = Depends(get_current_user)) -> object:
+    await _require_owner(request, user, run_id)
     return await request.app.state.run_control_service.start(run_id, body.gpu_count)
 
 
 @router.post("/runs/{run_id}/cancel")
 async def cancel(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> object:
+    await _require_owner(request, user, run_id)
     return await request.app.state.run_control_service.cancel(run_id)
 
 
 @router.post("/internal/runs/{run_id}/complete")
 async def complete(
-    run_id: UUID, body: CompleteRequest, request: Request, user: User = Depends(get_current_user)
+    run_id: UUID, body: CompleteRequest, request: Request, user: User = Depends(require_admin)
 ) -> object:
     service = request.app.state.run_control_service
     # 真实执行器下走采集收尾；Fake 执行器保持原状态机语义。
@@ -76,12 +88,14 @@ async def await_run(
     run_id: UUID, body: AwaitRequest, request: Request, user: User = Depends(get_current_user)
 ) -> object:
     """阻塞等待真实执行结束并采集产物。Fake 后端直接返回当前 Run。"""
+    await _require_owner(request, user, run_id)
     return await request.app.state.run_control_service.await_completion(run_id, body.timeout_seconds)
 
 
 @router.get("/runs/{run_id}/collection")
 async def collection(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> object:
     """真实执行的产物采集报告（指标条数、artifact 清单、警告）。"""
+    await _require_owner(request, user, run_id)
     report = request.app.state.run_control_service.collection_report(run_id)
     if report is None:
         return {"collected": False, "metrics": [], "artifacts": [], "warnings": []}
@@ -108,7 +122,7 @@ async def collection(run_id: UUID, request: Request, user: User = Depends(get_cu
 
 @router.post("/internal/runs/{run_id}/progress")
 async def progress(
-    run_id: UUID, body: ProgressRequest, request: Request, user: User = Depends(get_current_user)
+    run_id: UUID, body: ProgressRequest, request: Request, user: User = Depends(require_admin)
 ) -> dict[str, bool]:
     await request.app.state.run_control_service.report_progress(run_id, body.percent, body.stage, body.eta_seconds)
     return {"accepted": True}
@@ -116,7 +130,7 @@ async def progress(
 
 @router.post("/internal/runs/{run_id}/metrics")
 async def metric(
-    run_id: UUID, body: MetricRequest, request: Request, user: User = Depends(get_current_user)
+    run_id: UUID, body: MetricRequest, request: Request, user: User = Depends(require_admin)
 ) -> dict[str, bool]:
     await request.app.state.run_control_service.report_metric(run_id, body.name, body.value, body.step)
     return {"accepted": True}
@@ -124,7 +138,7 @@ async def metric(
 
 @router.post("/internal/runs/{run_id}/resources")
 async def resource(
-    run_id: UUID, body: ResourceRequest, request: Request, user: User = Depends(get_current_user)
+    run_id: UUID, body: ResourceRequest, request: Request, user: User = Depends(require_admin)
 ) -> dict[str, bool]:
     await request.app.state.run_control_service.report_resource(
         run_id, body.gpu_index, body.utilization_percent, body.memory_used_mb, body.memory_total_mb
@@ -134,21 +148,25 @@ async def resource(
 
 @router.get("/runs/{run_id}/events")
 async def events(run_id: UUID, request: Request, after_id: int = 0, user: User = Depends(get_current_user)) -> object:
+    await _require_owner(request, user, run_id)
     return await request.app.state.run_events.list_after(run_id, after_id)
 
 
 @router.get("/runs/{run_id}/logs")
 async def logs(run_id: UUID, request: Request, after_id: int = 0, user: User = Depends(get_current_user)) -> object:
+    await _require_owner(request, user, run_id)
     return await request.app.state.run_logs.list_after(run_id, after_id)
 
 
 @router.get("/runs/{run_id}/resources")
 async def resources(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> object:
+    await _require_owner(request, user, run_id)
     return await request.app.state.resource_samples.list_by_run(run_id)
 
 
 @router.get("/runs/{run_id}/events/stream")
 async def stream(run_id: UUID, request: Request, user: User = Depends(get_current_user)) -> StreamingResponse:
+    await _require_owner(request, user, run_id)
     after_id = int(request.headers.get("Last-Event-ID", "0"))
 
     async def generate() -> AsyncIterator[str]:

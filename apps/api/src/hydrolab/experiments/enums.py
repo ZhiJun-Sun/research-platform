@@ -26,5 +26,6 @@ class RunStageName(StrEnum):
 
 class OutboxStatus(StrEnum):
     PENDING = "PENDING"
+    PUBLISHING = "PUBLISHING"
     PUBLISHED = "PUBLISHED"
     FAILED = "FAILED"

@@ -16,5 +16,8 @@ __pycache__/
 node_modules/
 apps/web/dist/
 
+# ZCode 本地会话/计划状态
+.zcode/
+
 # 系统
 .DS_Store

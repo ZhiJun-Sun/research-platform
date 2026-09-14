@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ObjectStorageBackend = Literal["fake", "local", "s3"]
@@ -19,6 +19,7 @@ TaskQueueBackend = Literal["fake", "celery"]
 ExperimentTrackerBackend = Literal["fake", "noop", "mlflow"]
 RunExecutorBackend = Literal["fake", "subprocess", "docker"]
 Environment = Literal["local", "test", "staging", "production"]
+DatabaseBackend = Literal["memory", "mysql"]
 
 
 class Settings(BaseSettings):
@@ -46,6 +47,10 @@ class Settings(BaseSettings):
     bootstrap_admin_name: str = "平台管理员"
 
     # --- 基础设施连接（未启用真实后端时可为空） ---
+    # 默认 database_backend=memory：进程内仓储，无数据库也可开发/测试，绝不连接外部库。
+    # 真实数据库需通过环境变量 HYDROLAB_DATABASE_BACKEND=mysql + HYDROLAB_DATABASE_URL 显式启用。
+    # 禁止在源码中写死远程地址/账号/密码；凭证只从环境变量注入。
+    database_backend: DatabaseBackend = "memory"
     database_url: str | None = None
     redis_url: str | None = None
     mlflow_tracking_uri: str | None = None
@@ -80,6 +85,14 @@ class Settings(BaseSettings):
     runner_data_root: Path | None = None
     runner_default_timeout_seconds: int = 6 * 3600
 
+    # --- Docker GPU Runner（RUN_EXECUTOR_BACKEND=docker 时生效） ---
+    # 镜像 digest 白名单；生产禁止通配符。空列表表示关闭真实镜像准入（不安全）。
+    runner_image_whitelist: list[str] = Field(default_factory=list)
+    # 容器默认禁网；按需放开。
+    runner_allow_network: bool = False
+    # 容器内受控解释器。
+    runner_container_python: str = "/usr/local/bin/python"
+
     # --- 配额 ---
     storage_quota_bytes: int = 500 * 1024**3
     storage_low_watermark_bytes: int = 50 * 1024**3
@@ -110,6 +123,12 @@ class Settings(BaseSettings):
             problems.append("MLflow 后端已启用但 HYDROLAB_MLFLOW_TRACKING_URI 未配置")
         if self.run_executor_backend == "subprocess":
             problems.append("subprocess Runner 缺少容器隔离，禁止在生产环境启用")
+        if self.run_executor_backend == "docker" and not self.runner_image_whitelist:
+            problems.append("Docker Runner 必须配置非空镜像白名单 HYDROLAB_RUNNER_IMAGE_WHITELIST")
+        if self.run_executor_backend == "docker" and (
+            self.database_backend != "mysql" or self.task_queue_backend != "celery"
+        ):
+            problems.append("独立 Docker Worker 要求 MySQL 与 Celery 后端")
         if not self.bootstrap_admin_email or not self.bootstrap_admin_password:
             problems.append("生产环境必须显式配置 BOOTSTRAP_ADMIN_EMAIL/PASSWORD")
         if problems:

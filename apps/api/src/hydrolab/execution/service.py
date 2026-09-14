@@ -12,10 +12,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any, cast
 from uuid import UUID
 
-from hydrolab.adapters.fake.task_queue import FakeTaskQueue
+from hydrolab.adapters.fake.run_executor import FakeRunExecutor
 from hydrolab.core.errors import conflict, not_found, validation_error
 from hydrolab.domain.entities import utcnow
-from hydrolab.adapters.fake.run_executor import FakeRunExecutor
 from hydrolab.execution.collector import ArtifactCollector, CollectionReport
 from hydrolab.execution.entities import ResourceSample, RunExecution
 from hydrolab.execution.memory import (
@@ -25,11 +24,24 @@ from hydrolab.execution.memory import (
     InMemoryResourceSamples,
     InMemoryRunEvents,
 )
-from hydrolab.experiments.entities import Run
-from hydrolab.experiments.enums import OutboxStatus, RunStatus
+from hydrolab.experiments.entities import OutboxEvent, Run
+from hydrolab.experiments.enums import RunStatus
+from hydrolab.experiments.errors import StaleStateError
 from hydrolab.experiments.repositories import ExperimentVersionStore, OutboxStore, RunStore
+from hydrolab.ports.dto import (
+    EventType,
+    ExternalRunRef,
+    MetricRecord,
+    ObjectRef,
+    RunHandle,
+    RunSpec,
+    RunState,
+    TaskEnvelope,
+    TrackingContext,
+)
+from hydrolab.ports.experiment_tracker import ExperimentTracker
 from hydrolab.ports.run_executor import RunExecutor
-from hydrolab.ports.dto import EventType, RunHandle, RunSpec, RunState, TaskEnvelope
+from hydrolab.ports.task_queue import TaskQueue
 
 
 class RunControlService:
@@ -42,8 +54,9 @@ class RunControlService:
         events: InMemoryRunEvents,
         logs: InMemoryLogs,
         samples: InMemoryResourceSamples,
-        queue: FakeTaskQueue,
+        queue: TaskQueue,
         executor: RunExecutor,
+        tracker: ExperimentTracker | None = None,
         versions: ExperimentVersionStore | None = None,
         code_versions: Any | None = None,
         template_versions: Any | None = None,
@@ -54,6 +67,7 @@ class RunControlService:
     ) -> None:
         self._runs, self._outbox, self._leases, self._executions = runs, outbox, leases, executions
         self._events, self._logs, self._samples, self._queue, self._executor = events, logs, samples, queue, executor
+        self._tracker = tracker
         self._versions = versions
         self._code_versions = code_versions
         self._template_versions = template_versions
@@ -62,35 +76,51 @@ class RunControlService:
         self._dataset_versions = dataset_versions
         self._artifacts = artifacts
         self._reports: dict[UUID, CollectionReport] = {}
+        self._tracking_refs: dict[UUID, ExternalRunRef] = {}
 
     @property
     def is_real_executor(self) -> bool:
-        """True 表示当前后端会真实执行训练进程。"""
-        return hasattr(self._executor, "prepare_workspace")
+        """True 表示当前后端会真实执行训练进程（Fake 显式标记 False）。"""
+        return bool(getattr(self._executor, "real_executor", False))
 
     def collection_report(self, run_id: UUID) -> CollectionReport | None:
         return self._reports.get(run_id)
 
     async def dispatch_pending(self) -> int:
         count = 0
-        for event in await self._outbox.list_pending():
-            if event.topic != "run.requested":
+        for event in await self._outbox.claim_pending(limit=1):
+            if event.topic not in ("run.requested", "run.cancel_requested"):
+                await self._outbox.reset_pending(event.id, event.published_at)
                 continue
-            await self._queue.enqueue(
-                TaskEnvelope(job_type="run.execute", resource_id=event.aggregate_id, payload=event.payload)
-            )
-            event.status, event.published_at = OutboxStatus.PUBLISHED, utcnow()
+            try:
+                async with asyncio.timeout(30):
+                    await self._queue.enqueue(TaskEnvelope(
+                        job_id=event.id,
+                        job_type="run.cancel" if event.topic == "run.cancel_requested" else "run.execute",
+                        resource_id=event.aggregate_id,
+                        payload=event.payload,
+                    ))
+            except Exception:
+                await self._outbox.reset_pending(event.id, event.published_at)
+                raise
+            await self._outbox.mark_published(event.id, utcnow(), event.published_at)
             count += 1
         return count
 
     async def start(self, run_id: UUID, gpu_count: int = 1) -> Run:
         run = await self._get_run(run_id)
+        if getattr(self._executor, "remote_executor", False):
+            if run.status != RunStatus.QUEUED:
+                raise conflict("仅 QUEUED Run 可调度")
+            # Submission already created a durable run.requested event.
+            return run
         if run.status != RunStatus.QUEUED:
             raise conflict("仅 QUEUED Run 可启动", {"status": run.status.value})
         leases = await self._leases.acquire(run_id, gpu_count, utcnow() + timedelta(minutes=2))
         if not leases:
             raise conflict("当前没有足够的可用 GPU")
         run.status, run.updated_at = RunStatus.PREPARING, utcnow()
+        await self._runs.save(run, expected_status=RunStatus.QUEUED)
         await self._event(EventType.STATUS_CHANGED, run_id, {"status": run.status.value})
         try:
             spec = await self._build_spec(run, gpu_count)
@@ -98,9 +128,11 @@ class RunControlService:
             # 传给子进程，因此 CUDA_VISIBLE_DEVICES 可确保双 Run 分别落在 GPU 0/1。
             spec.env["CUDA_VISIBLE_DEVICES"] = ",".join(str(lease.gpu_index) for lease in leases)
             spec.env["HYDROLAB_GPU_INDICES"] = spec.env["CUDA_VISIBLE_DEVICES"]
+            spec.gpu_indices = [lease.gpu_index for lease in leases]
         except Exception:
             await self._leases.release_run(run_id)
             run.status, run.updated_at = RunStatus.FAILED, utcnow()
+            await self._runs.save(run, expected_status=RunStatus.PREPARING)
             await self._event(EventType.FAILED, run_id, {"status": run.status.value, "stage": "PREPARING"})
             raise
         try:
@@ -108,6 +140,7 @@ class RunControlService:
         except Exception:
             await self._leases.release_run(run_id)
             run.status = RunStatus.FAILED
+            await self._runs.save(run, expected_status=RunStatus.PREPARING)
             raise
         await self._executions.add(
             RunExecution(
@@ -118,6 +151,7 @@ class RunControlService:
             )
         )
         run.status, run.updated_at = RunStatus.RUNNING, utcnow()
+        await self._runs.save(run, expected_status=RunStatus.PREPARING)
         await self._event(
             EventType.STATUS_CHANGED, run_id, {"status": run.status.value, "gpu_indices": [x.gpu_index for x in leases]}
         )
@@ -125,7 +159,34 @@ class RunControlService:
             run_id,
             f"{'Subprocess' if self.is_real_executor else 'Fake'} runner started: {' '.join(spec.argv)}\n",
         )
+        await self._track_start(run, spec, [x.gpu_index for x in leases])
         return run
+
+    async def _track_start(self, run: Run, spec: RunSpec, gpu_indices: list[int]) -> None:
+        """在外部跟踪系统登记 Run（失败不反向覆盖业务 Run 状态，可重放）。"""
+        if self._tracker is None:
+            return
+        try:
+            ref = await self._tracker.start_run(
+                TrackingContext(
+                    run_id=run.id,
+                    experiment_version_id=run.experiment_version_id,
+                    display_name=self._experiment_name(run),
+                    tags={
+                        "hydrolab.run.status": run.status.value,
+                        "hydrolab.gpu_indices": ",".join(str(i) for i in gpu_indices),
+                    },
+                )
+            )
+            self._tracking_refs[run.id] = ref
+            await self._tracker.log_parameters(
+                ref,
+                {"argv": " ".join(spec.argv), "image_digest": spec.image_digest, **spec.env},
+            )
+        except Exception as exc:
+            await self._logs.append(
+                run.id, f"[tracker] 登记失败（不影响业务状态）: {exc.__class__.__name__}\n"
+            )
 
     async def _build_spec(self, run: Run, gpu_count: int) -> RunSpec:
         """从冻结 ExperimentVersion 解析真实执行规格。
@@ -152,14 +213,17 @@ class RunControlService:
         if code is None or not code.object_key:
             raise conflict("冻结代码版本缺少对象内容，无法物化执行")
 
-        archive = self._read_object(code.object_key)
+        archive = await self._read_object(code.object_key)
         dataset_version_id = config.get("dataset_version_id")
         dataset_files = await self._materialize_dataset(dataset_version_id)
         workspace = self._executor.prepare_workspace(  # type: ignore[attr-defined]
             run.id, archive, dataset_files
         )
 
-        argv = self._render_argv(argv, config.get("parameters") or {}, run)
+        argv = self._render_argv(argv, config.get("parameters") or {}, run, self._process_output_dir(workspace))
+        image_digest = config.get("environment_image_digest")
+        if getattr(self._executor, "requires_image_digest", False) and not image_digest:
+            raise validation_error("Docker Runner 要求环境版本提供不可变 image_digest")
         await self._event(
             EventType.STAGE_CHANGED,
             run.id,
@@ -174,21 +238,42 @@ class RunControlService:
         return RunSpec(
             run_id=run.id,
             argv=argv,
-            image_digest=str(config.get("environment_content_hash") or "local:subprocess"),
+            image_digest=str(
+                image_digest
+                or config.get("environment_content_hash")
+                or "local:subprocess"
+            ),
             gpu_count=0 if gpu_count is None else gpu_count,
             env={"HYDROLAB_EXPERIMENT": self._experiment_name(run)},
+            read_only_mounts=[str(workspace / "code")],
+            writable_mount=str(workspace / "output"),
+            timeout_seconds=getattr(self._executor, "_default_timeout", 6 * 3600),
         )
 
     @staticmethod
     def _experiment_name(run: Run) -> str:
         return f"hydrolab_{run.id.hex[:12]}"
 
-    def _render_argv(self, argv: list[str], parameters: dict[str, Any], run: Run) -> list[str]:
-        """渲染 argv 占位符：{run_name}/{run_id} 与冻结参数 {key}。"""
+    def _process_output_dir(self, workspace: object) -> str:
+        """返回训练进程可写输出目录的进程内路径。
+
+        Docker 容器内固定为 /workspace/output（宿主机目录已作为 rw 挂载）；
+        subprocess 直接指向宿主机工作区的 output。训练脚本必须写这里，
+        代码挂载保持只读。
+        """
+        if getattr(self._executor, "requires_image_digest", False):
+            return "/workspace/output"
+        return str(Path(workspace) / "output")
+
+    def _render_argv(
+        self, argv: list[str], parameters: dict[str, Any], run: Run, output_dir: str = "/workspace/output"
+    ) -> list[str]:
+        """渲染 argv 占位符：{run_name}/{run_id}/{OUTPUT_DIR} 与冻结参数 {key}。"""
         context: dict[str, str] = {
             "run_id": str(run.id),
             "run_name": self._experiment_name(run),
             "experiment": self._experiment_name(run),
+            "OUTPUT_DIR": output_dir,
         }
         for key, value in parameters.items():
             context[str(key)] = "" if value is None else str(value)
@@ -226,7 +311,7 @@ class RunControlService:
         if artifact is None or not artifact.object_key:
             raise conflict("数据集源文件缺少对象内容，无法物化")
 
-        payload = self._read_object(artifact.object_key)
+        payload = await self._read_object(artifact.object_key)
         if str(manifest.get("format") or "").upper() == "BUNDLE":
             return self._expand_bundle(payload)
 
@@ -253,7 +338,7 @@ class RunControlService:
             raise conflict("数据集版本内容为空，无法物化")
         return files
 
-    def _read_object(self, key: str) -> bytes:
+    async def _read_object(self, key: str) -> bytes:
         if self._storage is None:
             raise validation_error("真实 Runner 需要注入对象存储")
         root = getattr(self._storage, "_root", None)
@@ -265,9 +350,15 @@ class RunControlService:
         if isinstance(objects, dict) and key in objects:
             payload = objects[key]
             return payload if isinstance(payload, bytes) else bytes(payload)
-        raise conflict("对象存储中找不到冻结内容", {"key": key})
+        stream = await self._storage.open_range(ObjectRef(key=key), 0)
+        try:
+            return stream.read()
+        finally:
+            stream.close()
 
-    async def await_completion(self, run_id: UUID, timeout: float | None = None) -> Run:
+    async def await_completion(
+        self, run_id: UUID, timeout: float | None = None  # noqa: ASYNC109 - orchestration timeout API
+    ) -> Run:
         """等待真实执行结束，随后采集产物并落地结果。"""
         run = await self._get_run(run_id)
         execution = await self._executions.get(run_id)
@@ -283,8 +374,12 @@ class RunControlService:
 
     async def finalize(self, run_id: UUID, exit_code: int) -> Run:
         """真实执行结束后的收尾：采集产物、释放租约、发出终态事件。"""
+        if getattr(self._executor, "remote_executor", False):
+            raise conflict("仅 Worker 可确认训练终态")
         run = await self._get_run(run_id)
         report: CollectionReport | None = None
+        if run.status in (RunStatus.CANCELLED, RunStatus.SUCCEEDED, RunStatus.FAILED):
+            return run
         if exit_code == 0 and self._collector is not None and self.is_real_executor:
             workspace = self._executor.workspace_for(run_id)  # type: ignore[attr-defined]
             report = await asyncio.to_thread(
@@ -325,6 +420,14 @@ class RunControlService:
             )
 
         run.status, run.updated_at = (RunStatus.SUCCEEDED if exit_code == 0 else RunStatus.FAILED), utcnow()
+        try:
+            await self._runs.save(run, expected_status=[RunStatus.RUNNING, RunStatus.PREPARING])
+        except StaleStateError:
+            # 并发方已把 Run 推进/收敛到其它状态；终态不得被覆盖。
+            fresh = await self._get_run(run_id)
+            await self._leases.release_run(run_id)
+            await self._executions.remove(run_id)
+            return fresh
         await self._leases.release_run(run_id)
         await self._executions.remove(run_id)
         await self._event(
@@ -336,11 +439,42 @@ class RunControlService:
                 "metrics_collected": 0 if report is None else len(report.metrics),
             },
         )
+        await self._track_finish(run_id, run.status.value, None if report is None else report.metrics)
         return run
+
+    async def _track_finish(
+        self, run_id: UUID, status: str, metrics: list[Any] | None = None
+    ) -> None:
+        """把指标与终态同步到外部跟踪系统；失败不反向覆盖业务 Run 状态。"""
+        if self._tracker is None:
+            return
+        ref = self._tracking_refs.get(run_id)
+        if ref is None:
+            return
+        try:
+            if metrics:
+                await self._tracker.log_metrics(
+                    ref,
+                    [
+                        MetricRecord(name=m.name, value=m.value, step=m.horizon)
+                        for m in metrics
+                    ],
+                )
+            await self._tracker.finish_run(ref, status)
+        except Exception as exc:
+            await self._logs.append(
+                run_id, f"[tracker] 同步终态失败（不影响业务状态）: {exc.__class__.__name__}\n"
+            )
+            self._tracking_refs.pop(run_id, None)
 
     async def cancel(self, run_id: UUID) -> Run:
         run = await self._get_run(run_id)
         if run.status in (RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.CANCELLED):
+            return run
+        if getattr(self._executor, "remote_executor", False):
+            await self._outbox.add(OutboxEvent(
+                aggregate_type="run", aggregate_id=run_id, topic="run.cancel_requested", payload={},
+            ))
             return run
         execution = await self._executions.get(run_id)
         if execution:
@@ -348,12 +482,22 @@ class RunControlService:
                 RunHandle(run_id=run_id, external_id=execution.external_id, state=RunState.RUNNING)
             )
         run.status, run.updated_at = RunStatus.CANCELLED, utcnow()
+        try:
+            await self._runs.save(run)
+        except StaleStateError:
+            # 并发已完成/已取消：以数据库当前状态收敛，终态不被覆盖。
+            fresh = await self._get_run(run_id)
+            await self._leases.release_run(run_id)
+            await self._executions.remove(run_id)
+            return fresh
         await self._leases.release_run(run_id)
         await self._executions.remove(run_id)
         await self._event(EventType.STATUS_CHANGED, run_id, {"status": run.status.value})
         return run
 
     async def complete_fake(self, run_id: UUID, exit_code: int = 0) -> Run:
+        if getattr(self._executor, "remote_executor", False):
+            raise conflict("仅 Worker 可确认训练终态")
         run = await self._get_run(run_id)
         execution = await self._executions.get(run_id)
         if execution is None:

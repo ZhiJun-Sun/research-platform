@@ -85,6 +85,7 @@ def _environment_version_view(item: EnvironmentVersion) -> EnvironmentVersionVie
         status=item.status,
         base_image=item.base_image,
         python_version=item.python_version,
+        image_digest=item.image_digest,
         content_hash=item.content_hash,
     )
 

@@ -5,6 +5,7 @@ B1 使用 InMemory Repository（无数据库联调基线）；
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from hydrolab.access.grants import GrantService
 from hydrolab.access.policy import AccessPolicy
@@ -29,6 +30,9 @@ from hydrolab.repositories.memory import (
 )
 from hydrolab.sharing.service import ShareService
 
+if TYPE_CHECKING:
+    pass
+
 
 @dataclass
 class Repositories:
@@ -49,7 +53,25 @@ class AppServices:
     share: ShareService
 
 
-def build_repositories() -> Repositories:
+def build_repositories(session_factory=None) -> Repositories:
+    if session_factory is not None:
+        from hydrolab.db.repositories.identity import (
+            SqlAuditLogRepository,
+            SqlGrantRepository,
+            SqlInvitationRepository,
+            SqlSessionRepository,
+            SqlShareLinkRepository,
+            SqlUserRepository,
+        )
+
+        return Repositories(
+            users=SqlUserRepository(session_factory),
+            invitations=SqlInvitationRepository(session_factory),
+            sessions=SqlSessionRepository(session_factory),
+            grants=SqlGrantRepository(session_factory),
+            share_links=SqlShareLinkRepository(session_factory),
+            audit=SqlAuditLogRepository(session_factory),
+        )
     return Repositories(
         users=InMemoryUserRepository(),
         invitations=InMemoryInvitationRepository(),

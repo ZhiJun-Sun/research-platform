@@ -116,6 +116,7 @@ class EnvironmentVersionView(BaseModel):
     status: EnvironmentStatus
     base_image: str
     python_version: str
+    image_digest: str | None = None
     content_hash: str
 
 

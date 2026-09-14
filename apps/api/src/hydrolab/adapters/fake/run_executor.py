@@ -6,6 +6,8 @@ from hydrolab.ports.dto import RunHandle, RunSpec, RunState, RunStatusSnapshot
 
 
 class FakeRunExecutor:
+    real_executor = False  # 显式能力标记：Fake 不真实执行
+
     def __init__(self) -> None:
         self.injector = FailureInjector()
         self._runs: dict[str, RunStatusSnapshot] = {}

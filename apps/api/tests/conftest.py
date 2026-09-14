@@ -4,18 +4,20 @@ import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+# 测试默认使用全 Fake 后端 + 内存数据库，与外部环境完全解耦（强制覆盖，保证确定性）。
+# 必须在导入任何 hydrolab 模块前设置，避免 get_settings()（lru_cache）提前缓存成 mysql。
+os.environ["HYDROLAB_ENVIRONMENT"] = "test"
+os.environ["HYDROLAB_DATABASE_BACKEND"] = "memory"
+os.environ["HYDROLAB_OBJECT_STORAGE_BACKEND"] = "fake"
+os.environ["HYDROLAB_TASK_QUEUE_BACKEND"] = "fake"
+os.environ["HYDROLAB_EXPERIMENT_TRACKER_BACKEND"] = "fake"
+os.environ["HYDROLAB_RUN_EXECUTOR_BACKEND"] = "fake"
+
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 from hydrolab.main import create_app
-
-# 测试默认使用全 Fake 后端，与外部环境完全解耦（强制覆盖，保证确定性）
-os.environ["HYDROLAB_ENVIRONMENT"] = "test"
-os.environ.setdefault("HYDROLAB_OBJECT_STORAGE_BACKEND", "fake")
-os.environ.setdefault("HYDROLAB_TASK_QUEUE_BACKEND", "fake")
-os.environ.setdefault("HYDROLAB_EXPERIMENT_TRACKER_BACKEND", "fake")
-os.environ.setdefault("HYDROLAB_RUN_EXECUTOR_BACKEND", "fake")
 
 DEV_ADMIN_EMAIL = "admin@hydrolab.cn"
 DEV_ADMIN_PASSWORD = "admin123456"

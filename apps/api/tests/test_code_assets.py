@@ -105,10 +105,22 @@ async def test_environment_requires_immutable_image_digest(ctx: TestContext) -> 
         headers=headers,
     )
     assert invalid.status_code == 422
+    placeholder = await ctx.client.post(
+        f"/api/v1/environments/{environment.json()['id']}/versions",
+        json={"base_image": "python:3.11@sha256:REPLACE_ME", "python_version": "3.11"},
+        headers=headers,
+    )
+    assert placeholder.status_code == 422
+    short_hash = await ctx.client.post(
+        f"/api/v1/environments/{environment.json()['id']}/versions",
+        json={"base_image": "python:3.11@sha256:abc123", "python_version": "3.11"},
+        headers=headers,
+    )
+    assert short_hash.status_code == 422
     ready = await ctx.client.post(
         f"/api/v1/environments/{environment.json()['id']}/versions",
         json={
-            "base_image": "python:3.11@sha256:abc123",
+            "base_image": f"python:3.11@sha256:{'a' * 64}",
             "python_version": "3.11",
             "dependency_file": "requirements.txt",
             "dependency_content": "torch==2.0",
@@ -117,3 +129,4 @@ async def test_environment_requires_immutable_image_digest(ctx: TestContext) -> 
     )
     assert ready.status_code == 201, ready.text
     assert ready.json()["status"] == "READY"
+    assert ready.json()["image_digest"] == f"python:3.11@sha256:{'a' * 64}"

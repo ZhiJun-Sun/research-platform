@@ -112,6 +112,7 @@ class RunSpec(BaseModel):
     argv: list[str]
     image_digest: str
     gpu_count: int = 0
+    gpu_indices: list[int] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     read_only_mounts: list[str] = Field(default_factory=list)
     writable_mount: str | None = None
