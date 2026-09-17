@@ -1,9 +1,11 @@
 # HydroLab 生产编排。
 # 说明：
+#  - 顶部固定 Compose 项目名：容器/网络/卷一律带 hydrolab- 前缀，与宿主机上其他项目完全隔离。
 #  - 生产默认显式启用真实后端（MySQL/Redis/MinIO/MLflow）；对应凭证由 .env.production 提供。
 #  - 每个服务声明健康检查与依赖；Worker 独立于 API，避免任务重复执行。
 #  - GPU 训练由独立 Worker 承担，API 不挂载 Docker socket。
 #    不再提供指向占位镜像的 runner 服务。启用 GPU 需宿主机有 nvidia driver + docker gpu runtime。
+name: hydrolab
 services:
   mysql:
     image: mysql:8.0
@@ -42,7 +44,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env.production}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env.production}
     volumes: [minio-data:/data]
-    ports: ["127.0.0.1:9001:9001"]
+    ports: ["127.0.0.1:${HYDROLAB_MINIO_CONSOLE_PORT:-9001}:9001"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -127,7 +129,7 @@ services:
 
   web:
     build: ../apps/web
-    ports: ["127.0.0.1:8080:80"]
+    ports: ["127.0.0.1:${HYDROLAB_WEB_PORT:-8080}:80"]
     depends_on: [api]
     restart: unless-stopped
 
