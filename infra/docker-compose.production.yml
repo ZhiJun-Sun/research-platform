@@ -129,7 +129,11 @@ services:
     restart: unless-stopped
 
   web:
-    build: ../apps/web
+    build:
+      context: ../apps/web
+      args:
+        # 默认走 npmmirror（国内构建稳定）；其他网络环境在 .env.production 覆盖为官方源
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports: ["${HYDROLAB_WEB_BIND:-127.0.0.1}:${HYDROLAB_WEB_PORT:-8080}:80"]
     depends_on: [api]
     restart: unless-stopped
