@@ -44,7 +44,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env.production}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env.production}
     volumes: [minio-data:/data]
-    ports: ["127.0.0.1:${HYDROLAB_MINIO_CONSOLE_PORT:-9001}:9001"]
+    ports: ["${HYDROLAB_MINIO_CONSOLE_BIND:-127.0.0.1}:${HYDROLAB_MINIO_CONSOLE_PORT:-9001}:9001"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
@@ -68,8 +68,9 @@ services:
     env_file: ${HYDROLAB_ENV_FILE:-.env.production}
     environment:
       HYDROLAB_ENVIRONMENT: production
-      HYDROLAB_PUBLIC_BASE_URL: https://hydrolab.example.com
-      HYDROLAB_CORS_ORIGINS: '["https://hydrolab.example.com"]'
+      # 对外访问地址与跨域白名单由 .env.production 提供（影响分享链接生成；同源部署 CORS 可留空）
+      HYDROLAB_PUBLIC_BASE_URL: ${HYDROLAB_PUBLIC_BASE_URL:-http://127.0.0.1:8080}
+      HYDROLAB_CORS_ORIGINS: '${HYDROLAB_CORS_ORIGINS:-[]}'
       HYDROLAB_DATABASE_BACKEND: mysql
       HYDROLAB_DATABASE_URL: mysql+asyncmy://hydrolab:${MYSQL_PASSWORD}@mysql:3306/hydrolab?charset=utf8mb4
       HYDROLAB_REDIS_URL: redis://redis:6379/0
@@ -129,7 +130,7 @@ services:
 
   web:
     build: ../apps/web
-    ports: ["127.0.0.1:${HYDROLAB_WEB_PORT:-8080}:80"]
+    ports: ["${HYDROLAB_WEB_BIND:-127.0.0.1}:${HYDROLAB_WEB_PORT:-8080}:80"]
     depends_on: [api]
     restart: unless-stopped
 
