@@ -252,6 +252,17 @@ async def create_environment_version(
     )
 
 
+@router.get("/environments/{environment_id}/versions", response_model=list[EnvironmentVersionView])
+async def list_environment_versions(
+    environment_id: UUID, request: Request, user: User = Depends(get_current_user)
+) -> list[EnvironmentVersionView]:
+    await request.app.state.template_environment_service.get_environment(user, environment_id)
+    return [
+        _environment_version_view(x)
+        for x in await request.app.state.environment_versions.list_by_environment(environment_id)
+    ]
+
+
 @router.post("/parameter-presets", response_model=PresetView, status_code=201)
 async def create_preset(body: PresetCreate, request: Request, user: User = Depends(get_current_user)) -> PresetView:
     return _preset_view(

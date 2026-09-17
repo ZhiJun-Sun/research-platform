@@ -130,3 +130,31 @@ async def test_environment_requires_immutable_image_digest(ctx: TestContext) -> 
     assert ready.status_code == 201, ready.text
     assert ready.json()["status"] == "READY"
     assert ready.json()["image_digest"] == f"python:3.11@sha256:{'a' * 64}"
+
+
+async def test_list_environment_versions(ctx: TestContext) -> None:
+    from tests.conftest import invite_and_accept
+
+    headers = await login(ctx, "admin@hydrolab.cn", "admin123456")
+    environment = await ctx.client.post("/api/v1/environments", json={"name": "Python 3.12"}, headers=headers)
+    assert environment.status_code == 201
+    environment_id = environment.json()["id"]
+    created = await ctx.client.post(
+        f"/api/v1/environments/{environment_id}/versions",
+        json={"base_image": f"python:3.12@sha256:{'b' * 64}", "python_version": "3.12"},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+
+    versions = await ctx.client.get(f"/api/v1/environments/{environment_id}/versions", headers=headers)
+    assert versions.status_code == 200, versions.text
+    assert [item["id"] for item in versions.json()] == [created.json()["id"]]
+    assert versions.json()[0]["version_no"] == 1
+    assert versions.json()[0]["status"] == "READY"
+
+    missing = await ctx.client.get("/api/v1/environments/00000000-0000-0000-0000-000000000000/versions", headers=headers)
+    assert missing.status_code == 404
+
+    member = await invite_and_accept(ctx, headers, "env-reader@hydrolab.cn")
+    denied = await ctx.client.get(f"/api/v1/environments/{environment_id}/versions", headers=member)
+    assert denied.status_code == 403

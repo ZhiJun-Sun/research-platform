@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, cancelRealRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createExport, createPlot, createTemplate, createTemplateVersion, dispatchOutbox, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getRealSection, getRun, getRunCollection, getRunEvents, getRunResources, getRunStages, getRunLogs, getStoredUser, importCodeDirectory, importCodeGit, importCodeZip, ingestRunResult, listCheckpoints, listCodeImportRoots, listCodeRepositories, listCodeVersions, listDatasetVersions, listDatasets, listEnvironments, listEnvironmentVersions, listMetrics, listResults, listRuns, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, seedDemo, startRun, submitBatch, submitDraft, subscribeRunEvents, updateDraft } from './lib/api'
-import type { ApiBatchSubmitItem, ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiComparison, ApiDatasetVersion, ApiDirectoryPreview, ApiEnvironment, ApiMappingItem, ApiMetric, ApiResourceSample, ApiResult, ApiRunCollection, ApiRunEvent, ApiRunLog, ApiRunStage, ApiRunSummary, ApiTemplateVersion, ApiUser } from './lib/api'
+import { ApiError, cancelRealRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createEnvironment, createEnvironmentVersion, createExport, createPlot, createTemplate, createTemplateVersion, dispatchOutbox, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getHealthReady, getRealSection, getRun, getRunCollection, getRunEvents, getRunResources, getRunStages, getRunLogs, getStoredUser, importCodeDirectory, importCodeGit, importCodeZip, ingestRunResult, listCheckpoints, listCodeImportRoots, listCodeRepositories, listCodeVersions, listDatasetVersions, listDatasets, listEnvironments, listEnvironmentVersions, listMetrics, listResults, listRuns, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, seedDemo, startRun, submitBatch, submitDraft, subscribeRunEvents, updateDraft } from './lib/api'
+import type { ApiBatchSubmitItem, ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiComparison, ApiDatasetVersion, ApiDirectoryPreview, ApiEnvironment, ApiEnvironmentVersion, ApiMappingItem, ApiMetric, ApiResourceSample, ApiResult, ApiRunCollection, ApiRunEvent, ApiRunLog, ApiRunStage, ApiRunSummary, ApiTemplateVersion, ApiUser } from './lib/api'
 import {
   Activity,
   ArrowLeft,
@@ -92,7 +92,7 @@ function Dashboard({ openRun, openWizard, openBatch, openGpu }: { openRun: (runI
     try {
       await ensureDevSession()
       const runs = await listRuns()
-      setApiRuns([...runs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
+      setApiRuns([...runs].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()))
       try {
         const results = await listResults()
         let best: { value: number; name: string } | null = null
@@ -185,26 +185,126 @@ function Dashboard({ openRun, openWizard, openBatch, openGpu }: { openRun: (runI
 
 
 
+function ApiHealthBadge() {
+  const [health, setHealth] = useState<{ tone: 'pending' | 'ok' | 'degraded' | 'down'; text: string; detail: string }>({ tone: 'pending', text: '检查连接…', detail: '' })
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      try {
+        const result = await getHealthReady()
+        if (cancelled) return
+        if (result.status === 'ok') {
+          setHealth({ tone: 'ok', text: 'API 已连接', detail: `环境 ${result.environment} · 全部组件健康` })
+        } else {
+          const broken = Object.entries(result.components).filter(([, item]) => !item.healthy).map(([name]) => name)
+          setHealth({ tone: 'degraded', text: 'API 降级', detail: `组件异常：${broken.join('、') || '未知'}` })
+        }
+      } catch {
+        if (!cancelled) setHealth({ tone: 'down', text: 'API 不可达', detail: '无法连接后端服务；请确认 API 进程已启动。' })
+      }
+    }
+    void check()
+    const timer = setInterval(() => void check(), 30_000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
+  return <span className={`api-health-badge ${health.tone}`} title={health.detail}><span className="status-dot" />{health.text}</span>
+}
+
 function AssetAdminPage({ type }: { type:'permissions'|'environments' }) {
   const [environments, setEnvironments] = useState<ApiEnvironment[]>([])
-  const [versionsByEnvironment, setVersionsByEnvironment] = useState<Record<string, Array<{ id: string; version_no: number; status: string }>>>({})
+  const [versionsByEnvironment, setVersionsByEnvironment] = useState<Record<string, ApiEnvironmentVersion[]>>({})
   const [loading, setLoading] = useState(type === 'environments')
-  useEffect(() => {
+  const [creating, setCreating] = useState(false)
+  const [managingId, setManagingId] = useState<string | null>(null)
+  const [envName, setEnvName] = useState('')
+  const [envDescription, setEnvDescription] = useState('')
+  const [versionForm, setVersionForm] = useState({ base_image: '', python_version: '3.11', dependency_content: '' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const load = useCallback(async () => {
     if (type !== 'environments') return
     setLoading(true)
-    void (async () => {
-      try {
-        const items = await listEnvironments()
-        setEnvironments(items)
-        const versions: Record<string, Array<{ id: string; version_no: number; status: string }>> = {}
-        for (const item of items) {
-          try { versions[item.id] = await listEnvironmentVersions(item.id) } catch { versions[item.id] = [] }
-        }
-        setVersionsByEnvironment(versions)
-      } catch { /* 环境加载失败不阻塞页面 */ } finally { setLoading(false) }
-    })()
+    try {
+      const items = await listEnvironments()
+      setEnvironments(items)
+      const versions: Record<string, ApiEnvironmentVersion[]> = {}
+      for (const item of items) {
+        try { versions[item.id] = await listEnvironmentVersions(item.id) } catch { versions[item.id] = [] }
+      }
+      setVersionsByEnvironment(versions)
+    } catch { /* 环境加载失败不阻塞页面 */ } finally { setLoading(false) }
   }, [type])
-  return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">{type==='permissions'?'ACCESS CONTROL':'RUNTIME ASSETS'}</p><h1>{type==='permissions'?'权限与分享':'运行环境'}</h1><p>{type==='permissions'?'集中管理所有资源的只读分享链接。':'管理可供代码和实验选择的版本化运行环境。'}</p></div><button className="button primary"><Plus size={15}/>{type==='permissions'?'创建分享':'创建环境'}</button></header><section className="section-block">{type === 'environments' ? <div className="asset-list">{loading ? <p className="quiet">正在加载运行环境…</p> : environments.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.description || '—'}</small></span><code>{versionsByEnvironment[item.id]?.length ?? 0} 个版本</code><button className="button ghost">管理</button></div>)}{!loading && !environments.length && <p className="quiet">暂无运行环境。</p>}</div> : <div className="asset-list">{[['北江目标流域 v3','有效至 09-05','尚未访问'],['Top-30 Best','永久有效','已访问 4 次']].map(row=><div key={row[0]}><HardDrive size={16}/><span><b>{row[0]}</b><small>{row[1]}</small></span><code>{row[2]}</code><button className="button ghost">管理</button></div>)}</div>}</section></div>
+  useEffect(() => { void load() }, [load])
+  const submitEnvironment = async () => {
+    const name = envName.trim()
+    if (!name || busy) return
+    setBusy(true); setError(null)
+    try {
+      await createEnvironment(name, envDescription.trim())
+      setEnvName(''); setEnvDescription(''); setCreating(false)
+      setMessage(`运行环境「${name}」已创建；请为它登记版本后即可在实验中选择。`)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '创建运行环境失败')
+    } finally { setBusy(false) }
+  }
+  const submitVersion = async (environmentId: string) => {
+    if (!versionForm.base_image.trim() || !versionForm.python_version.trim() || busy) return
+    setBusy(true); setError(null)
+    try {
+      await createEnvironmentVersion(environmentId, {
+        base_image: versionForm.base_image.trim(),
+        python_version: versionForm.python_version.trim(),
+        dependency_content: versionForm.dependency_content.trim() || null,
+      })
+      setVersionForm({ base_image: '', python_version: '3.11', dependency_content: '' })
+      setMessage('环境版本已登记。')
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '登记环境版本失败')
+    } finally { setBusy(false) }
+  }
+  if (type === 'permissions') {
+    return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">ACCESS CONTROL</p><h1>权限与分享</h1><p>集中管理所有资源的只读分享链接。</p></div><button className="button primary"><Plus size={15}/>创建分享</button></header><section className="section-block"><div className="asset-list">{[['北江目标流域 v3','有效至 09-05','尚未访问'],['Top-30 Best','永久有效','已访问 4 次']].map(row=><div key={row[0]}><HardDrive size={16}/><span><b>{row[0]}</b><small>{row[1]}</small></span><code>{row[2]}</code><button className="button ghost">管理</button></div>)}</div></section></div>
+  }
+  return (
+    <div className="page-stack">
+      <header className="page-heading"><div><p className="eyebrow">RUNTIME ASSETS</p><h1>运行环境</h1><p>管理可供代码和实验选择的版本化运行环境。</p></div><button className="button primary" onClick={() => { setCreating(open => !open); setMessage(null); setError(null) }}><Plus size={15}/>创建环境</button></header>
+      {message && <p className="success-notice">{message}</p>}
+      {error && <p className="error-notice">{error}</p>}
+      {creating && <section className="section-block env-create-form">
+        <label>环境名称<input value={envName} onChange={event => setEnvName(event.target.value)} placeholder="例如：PyTorch 2.3 CUDA"/></label>
+        <label>描述（可选）<input value={envDescription} onChange={event => setEnvDescription(event.target.value)} placeholder="用途说明"/></label>
+        <div className="page-actions"><button className="button primary" disabled={busy || !envName.trim()} onClick={() => void submitEnvironment()}>创建</button><button className="button ghost" onClick={() => setCreating(false)}>取消</button></div>
+      </section>}
+      <section className="section-block">
+        <div className="asset-list">
+          {loading ? <p className="quiet">正在加载运行环境…</p> : environments.map(item => (
+            <div key={item.id} className="env-row">
+              <HardDrive size={16}/>
+              <span><b>{item.name}</b><small>{item.description || '—'}</small></span>
+              <code>{versionsByEnvironment[item.id]?.length ?? 0} 个版本</code>
+              <button className="button ghost" onClick={() => { setManagingId(current => current === item.id ? null : item.id); setError(null) }}>{managingId === item.id ? '收起' : '管理'}</button>
+              {managingId === item.id && <div className="env-manage-panel">
+                <div className="env-version-list">
+                  {(versionsByEnvironment[item.id] ?? []).map(version => <span key={version.id}><code>v{version.version_no}</code><small>{version.status}</small></span>)}
+                  {!(versionsByEnvironment[item.id] ?? []).length && <p className="quiet">尚无版本；登记第一个版本后实验才能选择该环境。</p>}
+                </div>
+                <div className="env-version-form">
+                  <label>基础镜像<input value={versionForm.base_image} onChange={event => setVersionForm(form => ({ ...form, base_image: event.target.value }))} placeholder="例如：pytorch/pytorch:2.3.0-cuda12.1-runtime"/></label>
+                  <label>Python 版本<input value={versionForm.python_version} onChange={event => setVersionForm(form => ({ ...form, python_version: event.target.value }))} placeholder="3.11"/></label>
+                  <label>依赖声明 requirements（可选）<textarea value={versionForm.dependency_content} onChange={event => setVersionForm(form => ({ ...form, dependency_content: event.target.value }))} rows={3} placeholder={'numpy\npandas'}/></label>
+                  <button className="button secondary" disabled={busy || !versionForm.base_image.trim() || !versionForm.python_version.trim()} onClick={() => void submitVersion(item.id)}>登记版本</button>
+                </div>
+              </div>}
+            </div>
+          ))}
+          {!loading && !environments.length && <p className="quiet">暂无运行环境；点击右上角「创建环境」开始。</p>}
+        </div>
+      </section>
+    </div>
+  )
 }
 
 
@@ -642,8 +742,8 @@ function BatchSubmitPanel({ close }: { close: () => void }) {
       ])
       const versions = await Promise.all(loadedDatasets.map(async dataset => (await listDatasetVersions(dataset.id)).map(version => ({ ...version, datasetName: dataset.name }))))
       setDatasetVersions(versions.flat().filter(version => version.status === 'READY'))
-      const code = await Promise.all(loadedRepositories.map(listCodeVersions)); setCodeVersions(code.flat().filter(version => version.status === 'READY'))
-      const template = await Promise.all(loadedTemplates.map(listTemplateVersions)); setTemplateVersions(template.flat())
+      const code = await Promise.all(loadedRepositories.map(item => listCodeVersions(item.id))); setCodeVersions(code.flat().filter(version => version.status === 'READY'))
+      const template = await Promise.all(loadedTemplates.map(item => listTemplateVersions(item.id))); setTemplateVersions(template.flat())
       const environment = await Promise.all(loadedEnvironments.map(async item => (await listEnvironmentVersions(item.id)).map(version => ({ ...version, environmentName: item.name }))))
       setEnvironmentVersions(environment.flat().filter(version => version.status === 'READY'))
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : '加载可运行资源失败') } finally { setLoading(false) }
@@ -894,7 +994,7 @@ function CodeRepositoryPanel() {
   return <div className="page-stack"><header className="page-heading"><div><p className="eyebrow">MODEL CODE</p><h1>模型代码 / 模板</h1><p>每位用户仅看到自己拥有或被授权的代码仓库、不可变版本与可执行模板。</p></div><button className="button secondary" onClick={() => void load()}><RefreshCw size={15}/>刷新</button></header><section className="code-import-panel"><div className="dataset-import-heading"><div><p className="eyebrow">IMPORT CODE</p><h2>导入模型代码</h2><p>ZIP 会安全检查并冻结到对象存储；Git 仅登记 HTTPS 来源，等待 Worker 拉取固定 Commit。</p></div></div><div className="source-toggle"><button className={source === 'zip' ? 'active' : ''} onClick={() => setSource('zip')}>本地 ZIP</button><button className={source === 'git' ? 'active' : ''} onClick={() => setSource('git')}>Git HTTPS</button><button className={source === 'dir' ? 'active' : ''} onClick={() => setSource('dir')}>服务器目录</button></div><div className="dataset-import-fields"><label>代码仓库名称 <em>必填</em><input value={name} onChange={event => setName(event.target.value)} placeholder="例如：KG-MoE-MS 北江实验" /></label><label>说明 <span>可选</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="例如：2024 训练脚本与配置" /></label></div>{source === 'zip' ? <label className="dataset-drop-zone"><FileUp size={26}/><div><b>{file ? file.name : '选择包含训练入口的 ZIP 归档'}</b><span>{file ? `${(file.size / 1024).toFixed(1)} KB · 将检查文件清单并创建不可变版本` : '不执行 ZIP 内代码；拒绝路径穿越、符号链接和压缩炸弹'}</span></div><input className="visually-hidden" type="file" accept=".zip,application/zip" onChange={event => setFile(event.target.files?.[0] ?? null)} /></label> : <div className="dataset-import-fields"><label>Git HTTPS 地址 <em>必填</em><input value={gitUrl} onChange={event => setGitUrl(event.target.value)} placeholder="https://github.com/org/repository.git" /></label><label>固定 Commit <span>建议填写</span><input value={commit} onChange={event => setCommit(event.target.value)} placeholder="例如：a1b2c3d4" /></label></div>}{source === 'dir' && <div className="directory-import"><div className="dataset-import-fields"><label>服务器目录绝对路径 <em>必填</em><input value={dirPath} onChange={event => setDirPath(event.target.value)} placeholder={importRoots[0] ? `${importRoots[0]}/my-project` : '/srv/projects/my-project'} /></label></div><p className="quiet">允许导入的根目录：{importRoots.length ? importRoots.join('、') : '管理员尚未配置 HYDROLAB_CODE_IMPORT_ROOTS，目录导入不可用'}</p><button className="button secondary" onClick={() => void runPreview()} disabled={previewing || !importRoots.length}><Search size={15}/>{previewing ? '正在扫描…' : '预览目录快照'}</button>{preview && <div className="directory-preview"><div className="metadata-grid"><div><span>代码文件</span><b>{preview.file_count} 个</b></div><div><span>解压体积</span><b>{(preview.uncompressed_bytes / 1024).toFixed(0)} KB</b></div><div><span>归档体积</span><b>{(preview.archive_bytes / 1024).toFixed(0)} KB</b></div><div><span>内容哈希</span><b className="mono">{preview.content_hash.slice(0, 12)}</b></div></div><p>入口候选：{preview.entrypoints.slice(0, 6).join('、') || '未识别到根目录 Python 入口'}</p><p>依赖清单：{preview.detected_manifests.join('、') || '未识别'}</p><details><summary>查看前 20 个文件</summary><p className="mono">{preview.files.slice(0, 20).join('、')}</p></details></div>}</div>}<div className="dataset-import-footer"><p>导入后，实验 Runner 会把选中的不可变版本物化到受控工作目录，再按模板 argv 执行；不会直接执行任意宿主机路径。</p><button className="button primary" onClick={() => void submit()} disabled={submitting}><FileCode2 size={15}/>{submitting ? '正在导入…' : '导入代码版本'}</button></div>{message && <p className="onboarding"><b>{message}</b></p>}{error && <p className="error-notice">代码导入错误：{error}</p>}</section><section className="section-block"><div className="section-heading"><div><h2>我的代码仓库</h2><p>{repositories.length} 个可访问仓库 · 每个版本均可追溯来源、内容摘要与执行入口。</p></div></div><div className="code-repository-list">{repositories.map(repo => <article key={repo.id}><header><div><FileCode2 size={18}/><span><b>{repo.name}</b><small>{repo.description || '未填写说明'}</small></span></div><code>{repo.id.slice(0, 8)}</code></header>{(versions[repo.id] ?? []).map(version => <div className="code-version-row" key={version.id}><div><b>v{version.version_no} · {version.source_type}</b><small>{version.status === 'READY' ? `存储键：${version.object_key ?? '—'}` : `来源：${version.source_ref ?? '—'}${version.commit_sha ? ` @ ${version.commit_sha}` : ''}`}</small></div><div><code>{version.content_hash?.slice(0, 12) ?? '等待拉取'}</code><span>{version.manifest.file_count ?? 0} 个文件 · {(version.manifest.detected_manifests ?? []).join('、') || '未识别依赖清单'}</span></div><details><summary>查看文件与执行说明</summary><p>Runner 工作目录：<code>/workspace/code</code>（运行时受控物化，不是宿主机固定路径）</p><p>文件：{(version.manifest.files ?? []).slice(0, 12).join('、') || 'Git 拉取后生成'}</p>{version.status === 'READY' && <div className="template-entrypoint"><label>训练入口 argv<input value={entrypoints[version.id] ?? 'python train.py'} onChange={event => setEntrypoints(current => ({ ...current, [version.id]: event.target.value }))} placeholder="python train.py" /></label><button className="button secondary" onClick={() => void createExecutable(repo, version)} disabled={submitting}>创建可执行模板</button></div>}</details></div>)}{!(versions[repo.id] ?? []).length && <p className="quiet">尚未导入版本。</p>}</article>)}{!repositories.length && <p className="quiet">还没有代码仓库。请先导入 ZIP 或登记 Git HTTPS 地址。</p>}</div></section></div>
 }
 
-function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' | 'environments' }) {
+function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' }) {
   const [items, setItems] = useState<ApiCatalogItem[]>([])
   const [draftName, setDraftName] = useState('')
   const [commandMessage, setCommandMessage] = useState<string | null>(null)
@@ -914,7 +1014,6 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     experiments: ['EXPERIMENTS', '实验', '冻结配置与独立 Run 历史'],
     checkpoints: ['CHECKPOINTS', 'Checkpoint', '可复用模型权重与兼容性结论'],
     results: ['RESULTS', '结果与对比', '成功 Run 的指标、产物与可比性'],
-    environments: ['RUNTIME ASSETS', '运行环境', '版本化镜像与依赖锁定'],
   }[section]
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -960,7 +1059,7 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
           setOperationMessage(`已读取 ${metrics.length} 条指标：${metrics.map(item => `${item.name}=${item.value}`).join('，')}`)
         } else if (operation === 'plot') {
           const plot = await createPlot([ids[0]])
-          setOperationMessage(`绘图规格已创建：${plot.id}`)
+          setOperationMessage(`绘图规格已创建：${plot.plot.id}`)
         } else if (operation === 'export') {
           const exported = await createExport([ids[0]])
           setOperationMessage(`导出清单已创建：${exported.id}`)
@@ -1015,7 +1114,7 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     {section === 'datasets' && <DatasetImportPanel reload={load} />}
     {section === 'checkpoints' && <section className="section-block"><div className="section-heading"><div><h2>复用兼容性校验</h2><p>使用当前 Checkpoint 的冻结来源配置执行 Resume 校验。</p></div><button className="button primary" onClick={() => void runOperation('checkpoint')} disabled={submitting}>{submitting ? '正在校验…' : '校验 Resume 兼容性'}</button></div></section>}
     {section === 'results' && <section className="section-block"><div className="section-heading"><div><h2>结果操作</h2><p>以下操作调用正式指标、绘图规格、导出清单与结果对比 API。</p></div><div className="page-actions"><button className="button secondary" onClick={() => void runOperation('metrics')} disabled={submitting}>读取指标</button><button className="button secondary" onClick={() => void runOperation('plot')} disabled={submitting}>创建绘图</button><button className="button secondary" onClick={() => void runOperation('export')} disabled={submitting}>创建导出</button><button className="button primary" onClick={() => void runOperation('compare')} disabled={submitting}>比较结果</button></div></div></section>}
-    {section === 'experiments' && <section className="experiment-launch-card"><div className="experiment-launch-head"><div><p className="eyebrow">NEW RUN</p><h2>创建训练实验</h2><p>明确选择代码模板、数据版本与运行环境后，冻结配置并创建一个独立的队列 Run。</p></div><span className="status-badge neutral">冻结提交</span></div><div className="experiment-launch-grid"><div className="experiment-config"><div className="experiment-step"><span>01</span><div><b>实验标识</b><small>该名称将用于实验、Run 与结果追溯。</small></div></div><label>实验名称 <em>必填</em><input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：北江 Top-30 迁移训练" /></label><div className="experiment-step"><span>02</span><div><b>可执行代码与入口</b><small>模板固定关联一个不可变 CodeVersion 和 argv 训练入口。</small></div></div><label>训练模板版本 <em>必填</em><select value={selectedTemplateVersionId} onChange={event => setSelectedTemplateVersionId(event.target.value)}><option value="">请选择一个代码模板版本</option>{templateOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>{selectedTemplateOption && <div className="selected-template"><FileCode2 size={16}/><div><b>已选择可执行模板</b><span>{selectedTemplateOption.label}</span><code>CodeVersion {selectedTemplateOption.codeVersionId.slice(0, 8)}</code></div></div>}<div className="experiment-step"><span>03</span><div><b>目标数据版本</b><small>只能选择 READY 数据版本；提交后冻结为不可变输入。</small></div></div><label>数据版本 <em>必填</em><select value={selectedDatasetVersionId} onChange={event => setSelectedDatasetVersionId(event.target.value)}><option value="">选择一个 READY 数据版本</option>{datasetOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label><div className="experiment-step"><span>04</span><div><b>运行环境版本</b><small>选择 READY 环境版本作为执行镜像。</small></div></div><label>运行环境版本 <em>必填</em><select value={selectedEnvironmentVersionId} onChange={event => setSelectedEnvironmentVersionId(event.target.value)}><option value="">选择一个 READY 运行环境</option>{environmentOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label></div><aside className="experiment-freeze-summary"><p className="eyebrow">FROZEN INPUTS</p><h3>本次提交将冻结</h3><div><Database size={15}/><span><b>数据版本</b><small>{datasetOptions.find(option => option.id === selectedDatasetVersionId)?.label ?? '未选择'}</small></span><StatusBadge status={selectedDatasetVersionId ? 'READY' : 'PENDING'}/></div><div><FileCode2 size={15}/><span><b>代码与模板</b><small>{selectedTemplateOption ? `模板 ${selectedTemplateOption.id.slice(0, 8)} · 代码 ${selectedTemplateOption.codeVersionId.slice(0, 8)}` : '请选择代码模板版本'}</small></span><StatusBadge status={selectedTemplateOption ? 'READY' : 'PENDING'}/></div><div><HardDrive size={15}/><span><b>运行环境</b><small>{environmentOptions.find(option => option.id === selectedEnvironmentVersionId)?.label ?? '未选择'}</small></span><StatusBadge status={selectedEnvironmentVersionId ? 'READY' : 'PENDING'}/></div><p className="experiment-dispatch-note">提交会真实创建 Draft、冻结 ExperimentVersion 并进入队列；当前 Fake Runner 只模拟调度和事件，不执行真实 GPU 训练。</p></aside></div><footer className="experiment-launch-footer"><div><b>提交前检查</b><span>{canSubmitExperiment ? '已完成全部必填选择；提交后配置不可修改。' : '请完成实验名称、代码模板、数据版本与运行环境的选择。'}</span></div><button className="button primary" onClick={() => void create()} disabled={submitting || !canSubmitExperiment}><FlaskConical size={15}/>{submitting ? '正在冻结并提交…' : '冻结配置并创建 Run'}</button></footer>{!templateOptions.length && <p className="error-notice">尚无可执行模板。请先在“模型代码 / 模板”的代码版本详情中创建训练入口。</p>}</section>}
+    {section === 'experiments' && <section className="experiment-launch-card"><div className="experiment-launch-head"><div><p className="eyebrow">NEW RUN</p><h2>创建训练实验</h2><p>明确选择代码模板、数据版本与运行环境后，冻结配置并创建一个独立的队列 Run。</p></div><span className="status-badge neutral">冻结提交</span></div><div className="experiment-launch-grid"><div className="experiment-config"><div className="experiment-field"><div className="experiment-step"><span>01</span><div><b>实验标识</b><small>该名称将用于实验、Run 与结果追溯。</small></div></div><label>实验名称 <em>必填</em><input value={draftName} onChange={event => setDraftName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void create() }} placeholder="例如：北江 Top-30 迁移训练" /></label></div><div className="experiment-field"><div className="experiment-step"><span>02</span><div><b>可执行代码与入口</b><small>模板固定关联一个不可变 CodeVersion 和 argv 训练入口。</small></div></div><label>训练模板版本 <em>必填</em><select value={selectedTemplateVersionId} onChange={event => setSelectedTemplateVersionId(event.target.value)}><option value="">请选择一个代码模板版本</option>{templateOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>{selectedTemplateOption && <div className="selected-template"><FileCode2 size={16}/><div><b>已选择可执行模板</b><span>{selectedTemplateOption.label}</span><code>CodeVersion {selectedTemplateOption.codeVersionId.slice(0, 8)}</code></div></div>}</div><div className="experiment-field"><div className="experiment-step"><span>03</span><div><b>目标数据版本</b><small>只能选择 READY 数据版本；提交后冻结为不可变输入。</small></div></div><label>数据版本 <em>必填</em><select value={selectedDatasetVersionId} onChange={event => setSelectedDatasetVersionId(event.target.value)}><option value="">选择一个 READY 数据版本</option>{datasetOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label></div><div className="experiment-field"><div className="experiment-step"><span>04</span><div><b>运行环境版本</b><small>选择 READY 环境版本作为执行镜像。</small></div></div><label>运行环境版本 <em>必填</em><select value={selectedEnvironmentVersionId} onChange={event => setSelectedEnvironmentVersionId(event.target.value)}><option value="">选择一个 READY 运行环境</option>{environmentOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label></div></div><aside className="experiment-freeze-summary"><p className="eyebrow">FROZEN INPUTS</p><h3>本次提交将冻结</h3><div><Database size={15}/><span><b>数据版本</b><small>{datasetOptions.find(option => option.id === selectedDatasetVersionId)?.label ?? '未选择'}</small></span><StatusBadge status={selectedDatasetVersionId ? 'READY' : 'PENDING'}/></div><div><FileCode2 size={15}/><span><b>代码与模板</b><small>{selectedTemplateOption ? `模板 ${selectedTemplateOption.id.slice(0, 8)} · 代码 ${selectedTemplateOption.codeVersionId.slice(0, 8)}` : '请选择代码模板版本'}</small></span><StatusBadge status={selectedTemplateOption ? 'READY' : 'PENDING'}/></div><div><HardDrive size={15}/><span><b>运行环境</b><small>{environmentOptions.find(option => option.id === selectedEnvironmentVersionId)?.label ?? '未选择'}</small></span><StatusBadge status={selectedEnvironmentVersionId ? 'READY' : 'PENDING'}/></div><p className="experiment-dispatch-note">提交会真实创建 Draft、冻结 ExperimentVersion 并进入队列；当前 Fake Runner 只模拟调度和事件，不执行真实 GPU 训练。</p></aside></div><footer className="experiment-launch-footer"><div><b>提交前检查</b><span>{canSubmitExperiment ? '已完成全部必填选择；提交后配置不可修改。' : '请完成实验名称、代码模板、数据版本与运行环境的选择。'}</span></div><button className="button primary" onClick={() => void create()} disabled={submitting || !canSubmitExperiment}><FlaskConical size={15}/>{submitting ? '正在冻结并提交…' : '冻结配置并创建 Run'}</button></footer>{!templateOptions.length && <p className="error-notice">尚无可执行模板。请先在“模型代码 / 模板”的代码版本详情中创建训练入口。</p>}</section>}
     <section className="section-block"><div className="section-heading"><div><h2>{loading ? '正在加载后端资源…' : `共 ${items.length} 项`}</h2><p>受保护 API · Token 自动恢复 · 后端重启后可重新登录</p></div></div>
     <div className="asset-list">{items.map(item => <div key={item.id}><HardDrive size={16}/><span><b>{item.name}</b><small>{item.subtitle}</small></span><code>{item.metadata.version ?? item.metadata.nse ?? item.metadata.mode ?? item.metadata.runs ?? item.metadata.model_signature ?? '—'}</code><StatusBadge status={item.status === 'SUCCEEDED' || item.status === 'READY' || item.status === 'COMPATIBLE' ? '已完成' : item.status}/></div>)}{!loading && !items.length && <p>当前没有可访问资源。</p>}</div>
     </section>
@@ -1048,7 +1147,6 @@ export default function App() {
   const [wizardOpen, setWizardOpen] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
   const [gpuOpen, setGpuOpen] = useState(false)
-  const [datasetCreateOpen, setDatasetCreateOpen] = useState(false)
   const [selectedResult, setSelectedResult] = useState<ApiResult | null>(null)
   const [compareResultIds, setCompareResultIds] = useState<string[]>([])
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1098,7 +1196,8 @@ export default function App() {
           <button className="icon-button menu-button" onClick={() => setMenuOpen(true)} aria-label="打开导航"><Menu size={18} /></button>
           <div className="project-switcher"><span className="project-dot" /><b>水文时序实验平台</b><span className="flow-label">数据 → 实验 → 结果</span></div>
           <div className="top-actions">
-            <span className="prototype-badge">已连接本地 API</span>
+            <span className="prototype-badge">HydroLab 实验平台</span>
+            <ApiHealthBadge />
             <button className="icon-button" onClick={cycleTheme} title={`主题：${theme}`} aria-label="切换明暗主题"><ThemeIcon size={17} /></button>
             <button className="icon-button" aria-label="设置"><Settings size={17} /></button>
           </div>
@@ -1115,14 +1214,13 @@ export default function App() {
               ? <RunComparison resultIds={compareResultIds} back={() => setCompareResultIds([])} />
               : <ResultIndex onOpen={setSelectedResult} onCompare={setCompareResultIds} />)}
           {view === 'permissions' && <AssetAdminPage type="permissions" />}
-          {view === 'environments' && <ApiCatalogPage section="environments" />}
+          {view === 'environments' && <AssetAdminPage type="environments" />}
           {view === 'run' && <RunDetail runId={runId} back={() => setView('dashboard')} />}
         </div>
       </main>
       {wizardOpen && <ExperimentWizard close={() => setWizardOpen(false)} />}
       {batchOpen && <BatchSubmitPanel close={() => setBatchOpen(false)} />}
       {gpuOpen && <GpuDrawer close={() => setGpuOpen(false)} />}
-      {datasetCreateOpen && <DatasetCreateModal close={() => setDatasetCreateOpen(false)} />}
     </div>
   )
 }

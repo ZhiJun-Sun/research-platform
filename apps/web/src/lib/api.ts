@@ -1,16 +1,15 @@
-export type ApiRunStatus = 'QUEUED' | 'PREPARING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED'
-
-export type ApiRun = { id: string; name: string; model: string; dataset: string; gpu: string; epoch: number; total_epochs: number; nse: number | null; status: ApiRunStatus; eta: string | null }
 export type ApiCatalogItem = { id: string; name: string; subtitle: string; status: string; metadata: Record<string, string> }
-export type ApiCatalog = { datasets: ApiCatalogItem[]; code_repositories: ApiCatalogItem[]; templates: ApiCatalogItem[]; environments: ApiCatalogItem[]; experiments: ApiCatalogItem[]; checkpoints: ApiCatalogItem[]; results: ApiCatalogItem[] }
 export type ApiDraft = { id: string; name: string; description: string; dataset_version_id: string | null; code_version_id: string | null; template_version_id: string | null; environment_version_id: string | null; parameter_values: Record<string, unknown> }
 export type ApiResult = { id: string; run_id: string; dataset_version_id: string; created_at: string }
 export type ApiCompatibility = { status: 'COMPATIBLE' | 'REPAIRABLE' | 'INCOMPATIBLE'; blockers: string[]; warnings: string[]; repair_plan: { code: string; title: string }[] }
+export type ApiHealthComponent = { backend: string; healthy: boolean; detail: string | null }
+export type ApiHealthReady = { status: string; environment: string; components: Record<string, ApiHealthComponent> }
+export type ApiEnvironmentVersion = { id: string; version_no: number; status: string }
 
 export type ApiSubmitResponse = { experiment: { id: string; name: string; description: string }; version: { id: string; version_no: number }; run: { id: string; status: string } }
 export type ApiMetric = { name: string; value: number; split: string; horizon: number | null; basin_id: string | null; event_id: string | null }
 export type ApiCheckpoint = { id: string; source_config: Record<string, unknown>; model_signature: string }
-export type ApiComparison = { metrics: Record<string, Record<string, number>>; baseline_result_id: string; dataset_version_id: string }
+export type ApiComparison = { metrics: Record<string, Record<string, number>>; delta_from_baseline: Record<string, Record<string, number>>; baseline_result_id: string; dataset_version_id: string }
 export type ApiBatchSubmitItem = { dataset_version_id: string; name: string; argv: string[]; parameter_values: Record<string, unknown>; run: { id: string; status: string } | null }
 export type ApiBatchSubmitResponse = { dry_run: boolean; items: ApiBatchSubmitItem[] }
 export type ApiArtifact = { id: string; result_id: string; kind: string; object_key: string; sha256: string }
@@ -43,14 +42,14 @@ export type ApiResourceSample = { run_id: string; gpu_index: number; utilization
 
 export type ApiUser = { id: string; email: string; display_name: string; is_admin: boolean; status: string }
 type LoginResponse = { tokens: { access_token: string; refresh_token: string }; user: ApiUser }
-type Workspace = { user_name: string; runs: ApiRun[]; gpu_count: number; queued_count: number }
 const TOKEN_KEY = 'hydrolab-api-token'
 const REFRESH_KEY = 'hydrolab-api-refresh-token'
 const USER_KEY = 'hydrolab-api-user'
 const API_ROOT = '/api/v1'
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message) }
+  status: number
+  constructor(status: number, message: string) { super(message); this.status = status }
   static isNetwork(error: unknown): boolean { return error instanceof TypeError }
 }
 
@@ -133,15 +132,15 @@ async function withSessionRetry<T>(operation: () => Promise<T>): Promise<T> {
 const authed = <T>(path: string, init?: RequestInit) => withSessionRetry(() => request<T>(path, init))
 
 export const seedDemo = () => authed<Record<string, string>>('/dev-demo/seed', { method: 'POST' })
-export const getWorkspace = () => authed<Workspace>('/dev-demo/workspace')
-export async function getRealSection(section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results' | 'environments'): Promise<ApiCatalogItem[]> {
+// 健康检查：无需登录；/api/v1 下的 health 由后端同时挂载，便于反向代理按 /api 前缀转发。
+export const getHealthReady = () => request<ApiHealthReady>('/health/ready')
+export async function getRealSection(section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results'): Promise<ApiCatalogItem[]> {
   const paths: Record<typeof section, string[]> = {
     datasets: ['/datasets'],
     code: ['/code-repositories', '/templates'],
     experiments: ['/experiments'],
     checkpoints: ['/checkpoints'],
     results: ['/results'],
-    environments: ['/environments'],
   }
   const groups = await Promise.all(paths[section].map(path => authed<Array<Record<string, unknown>>>(path)))
   const short = (value: unknown) => String(value ?? '').slice(0, 8)
@@ -165,8 +164,6 @@ export async function getRealSection(section: 'datasets' | 'code' | 'experiments
     }
   })
 }
-export const advanceRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/advance`, { method: 'POST' })
-export const cancelRun = (runId: string) => authed<ApiRun>(`/dev-demo/runs/${runId}/cancel`, { method: 'POST' })
 export const listTemplates = () => authed<ApiTemplate[]>('/templates')
 export const createTemplate = (repositoryId: string, name: string, description: string) => authed<ApiTemplate>('/templates', { method: 'POST', body: JSON.stringify({ code_repository_id: repositoryId, name, description }) })
 export const listTemplateVersions = (templateId: string) => authed<ApiTemplateVersion[]>(`/templates/${templateId}/versions`)
@@ -252,7 +249,9 @@ export const confirmDatasetMapping = (jobId: string, items: ApiMappingItem[]) =>
 export const listDatasets = () => authed<ApiDataset[]>('/datasets')
 export const listDatasetVersions = (datasetId: string) => authed<ApiDatasetVersion[]>(`/datasets/${datasetId}/versions`)
 export const listEnvironments = () => authed<ApiEnvironment[]>('/environments')
-export const listEnvironmentVersions = (environmentId: string) => authed<Array<{ id: string; version_no: number; status: string }>>(`/environments/${environmentId}/versions`)
+export const listEnvironmentVersions = (environmentId: string) => authed<ApiEnvironmentVersion[]>(`/environments/${environmentId}/versions`)
+export const createEnvironment = (name: string, description: string) => authed<ApiEnvironment>('/environments', { method: 'POST', body: JSON.stringify({ name, description }) })
+export const createEnvironmentVersion = (environmentId: string, body: { base_image: string; python_version: string; dependency_file?: string | null; dependency_content?: string | null }) => authed<ApiEnvironmentVersion>(`/environments/${environmentId}/versions`, { method: 'POST', body: JSON.stringify(body) })
 export const submitBatch = (body: { name_prefix: string; description: string; dataset_version_ids: string[]; code_version_id: string; template_version_id: string; environment_version_id: string; parameter_values: Record<string, unknown>; dry_run: boolean }) => authed<ApiBatchSubmitResponse>('/runs/batch', { method: 'POST', body: JSON.stringify(body) })
 export const createDraft = (name: string, description: string) => authed<ApiDraft>('/experiment-drafts', { method: 'POST', body: JSON.stringify({ name, description }) })
 export const listDrafts = () => authed<ApiDraft[]>('/experiment-drafts')

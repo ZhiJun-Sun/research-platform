@@ -173,6 +173,13 @@ class TemplateEnvironmentService:
         )
         return await self._environment_versions.add(version)
 
+    async def get_environment(self, actor: User, environment_id: UUID) -> RuntimeEnvironment:
+        environment = await self._environments.get(environment_id)
+        if environment is None:
+            raise not_found("运行环境不存在")
+        await self._policy.require(actor, ResourceType.RUNTIME_ENVIRONMENT, environment_id, Role.VIEWER)
+        return environment
+
     async def create_preset(
         self, owner: User, template_version_id: UUID, name: str, values: dict[str, Any]
     ) -> ParameterPreset:
