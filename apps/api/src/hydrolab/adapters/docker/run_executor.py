@@ -4,7 +4,8 @@
 - 仅允许白名单镜像（digest 固定），非白名单拒绝；
 - argv 直传 exec，从不经过 shell，避免命令注入；
 - 容器非 root、工作目录只读挂载、默认禁用网络（按配置放开）；
-- GPU 通过 nvidia device_requests 按 count 申请。
+- GPU 注入按 gpu_mode：device_requests（--gpus 等价，默认）或 nvidia_runtime
+  （CDI 模式宿主机，经 nvidia container runtime 注入）；none 不注入。
 
 实现形态：本文件实现 RunExecutor 端口，可用注入的 mock client 单测；
 真实部署建议把容器生命周期交给独立 Runner Controller（apps/runner），
@@ -37,12 +38,16 @@ class DockerGpuRunExecutor:
         container_python: str = "/usr/local/bin/python",
         default_timeout_seconds: int = 6 * 3600,
         workspace_root=None,
+        gpu_mode: str = "device_requests",
     ) -> None:
+        if gpu_mode not in ("device_requests", "nvidia_runtime", "none"):
+            raise validation_error("未知 gpu_mode", {"gpu_mode": gpu_mode})
         self._whitelist = {self._digest(i) for i in (image_whitelist or [])}
         self._client = docker_client
         self._allow_network = allow_network
         self._python = container_python
         self._default_timeout = default_timeout_seconds
+        self._gpu_mode = gpu_mode
         self._workspace_root = (
             Path(workspace_root).expanduser().resolve() if workspace_root else Path(".hydrolab-data/runs")
         )
@@ -142,7 +147,8 @@ class DockerGpuRunExecutor:
             client = self._client
 
         device_requests: list[dict] = []
-        if spec.gpu_count > 0:
+        runtime: str | None = None
+        if spec.gpu_count > 0 and self._gpu_mode == "device_requests":
             request = {
                 "Driver": "nvidia",
                 "Count": len(spec.gpu_indices) if spec.gpu_indices else spec.gpu_count,
@@ -152,12 +158,21 @@ class DockerGpuRunExecutor:
                 request.pop("Count")
                 request["DeviceIDs"] = [str(index) for index in spec.gpu_indices]
             device_requests.append(request)
+        elif spec.gpu_count > 0 and self._gpu_mode == "nvidia_runtime":
+            # CDI 模式宿主机：经 nvidia container runtime 注入；租约到的物理卡序号
+            # 通过 NVIDIA_VISIBLE_DEVICES 暴露，容器内序号重排为 0..n-1。
+            runtime = "nvidia"
 
         env = dict(spec.env)
         env["HYDROLAB_RUN_ID"] = str(spec.run_id)
         env["HYDROLAB_OUTPUT_DIR"] = "/workspace/output"
-        # Container CUDA ordinals are local to the set exposed by DeviceIDs.
-        env["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in range(spec.gpu_count))
+        if self._gpu_mode != "none":
+            # Container CUDA ordinals are local to the set exposed by DeviceIDs/DeviceRequests.
+            env["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in range(spec.gpu_count))
+        if runtime == "nvidia":
+            env["NVIDIA_VISIBLE_DEVICES"] = (
+                ",".join(str(index) for index in spec.gpu_indices) if spec.gpu_indices else "all"
+            )
         env["PYTHONDONTWRITEBYTECODE"] = "1"
 
         volumes: dict[str, dict[str, str]] = {}
@@ -173,7 +188,7 @@ class DockerGpuRunExecutor:
                 raise validation_error("可写工作区不存在", {"path": str(output_path)})
             volumes[str(output_path)] = {"bind": "/workspace/output", "mode": "rw"}
 
-        container = client.containers.run(
+        run_kwargs: dict = dict(
             name=f"hydrolab-{spec.run_id.hex}",
             labels={"hydrolab.run_id": str(spec.run_id)},
             image=spec.image_digest,
@@ -188,6 +203,9 @@ class DockerGpuRunExecutor:
             device_requests=device_requests,
             volumes=volumes,
         )
+        if runtime is not None:
+            run_kwargs["runtime"] = runtime
+        container = client.containers.run(**run_kwargs)
         return container.id
 
     async def status(self, handle: RunHandle) -> RunStatusSnapshot:

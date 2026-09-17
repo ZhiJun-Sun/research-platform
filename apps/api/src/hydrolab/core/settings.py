@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     runner_allow_network: bool = False
     # 容器内受控解释器。
     runner_container_python: str = "/usr/local/bin/python"
+    # Docker Runner GPU 注入方式：device_requests=旧式 --gpus（默认）；
+    # nvidia_runtime=CDI 模式宿主机（报 "invoking the NVIDIA Container Runtime Hook
+    # directly ... not supported" 的机器用此值）；none=不注入 GPU。
+    runner_gpu_mode: Literal["device_requests", "nvidia_runtime", "none"] = "device_requests"
 
     # --- 配额 ---
     storage_quota_bytes: int = 500 * 1024**3

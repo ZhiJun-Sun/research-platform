@@ -244,9 +244,12 @@ else
     if [[ "$SKIP_GPU_SMOKE" -eq 1 ]]; then
       check "CUDA 容器冒烟测试" ok "--skip-gpu-smoke 跳过"
     elif docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi >/dev/null 2>&1; then
-      check "CUDA 容器冒烟测试(--gpus all)" ok "容器内可见 GPU，训练镜像可正常用卡"
+      check "CUDA 容器冒烟测试(--gpus all)" ok "容器内可见 GPU；保持 HYDROLAB_RUNNER_GPU_MODE=device_requests"
+    elif docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi >/dev/null 2>&1; then
+      check "CUDA 容器冒烟测试(--runtime=nvidia/CDI)" ok "容器内可见 GPU"
+      warn "GPU 注入模式" "此宿主机为 CDI 模式：在 .env.production 设 HYDROLAB_RUNNER_GPU_MODE=nvidia_runtime"
     else
-      check "CUDA 容器冒烟测试" fail "docker run --gpus all 失败：安装 nvidia-container-toolkit 并 systemctl restart docker 后重试（离线机器可用 --skip-gpu-smoke）"
+      check "CUDA 容器冒烟测试" fail "两种注入方式都失败：确认 nvidia-container-toolkit 安装、CDI spec 已生成（nvidia-ctk cdi generate）后 systemctl restart docker"
     fi
   fi
 fi

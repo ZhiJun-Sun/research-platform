@@ -109,6 +109,7 @@ async def test_production_handler_respects_database_ownership(monkeypatch, tmp_p
         validate_production=lambda: None, database_backend="mysql", run_executor_backend="docker",
         database_url="unused", runner_image_whitelist=[], runner_workspace_root=tmp_path,
         runner_allow_network=False, runner_container_python="python", runner_default_timeout_seconds=60,
+        runner_gpu_mode="device_requests",
     )
     monkeypatch.setattr(runtime, "get_settings", lambda: settings)
     monkeypatch.setattr(runtime, "create_async_engine", lambda *a, **k: engine)

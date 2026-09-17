@@ -152,6 +152,38 @@ async def test_healthcheck_false_when_daemon_down() -> None:
     assert await executor.healthcheck() is False
 
 
+async def test_nvidia_runtime_mode_uses_runtime_flag_and_visible_devices() -> None:
+    """CDI 模式宿主机：runtime=nvidia + NVIDIA_VISIBLE_DEVICES，不用 device_requests。"""
+    executor = DockerGpuRunExecutor(
+        image_whitelist=[_IMAGE],
+        docker_client=_mock_docker_client(),
+        gpu_mode="nvidia_runtime",
+    )
+    await executor.start(_spec(gpu_indices=[2], gpu_count=1))
+    kwargs = executor._client.containers.run.call_args.kwargs
+    assert kwargs["runtime"] == "nvidia"
+    assert kwargs["environment"]["NVIDIA_VISIBLE_DEVICES"] == "2"
+    assert kwargs["environment"]["CUDA_VISIBLE_DEVICES"] == "0"
+    assert kwargs["device_requests"] == []
+
+
+async def test_none_mode_skips_gpu_injection() -> None:
+    executor = DockerGpuRunExecutor(
+        image_whitelist=[_IMAGE], docker_client=_mock_docker_client(), gpu_mode="none"
+    )
+    await executor.start(_spec())
+    kwargs = executor._client.containers.run.call_args.kwargs
+    assert kwargs["device_requests"] == []
+    assert "runtime" not in kwargs
+    assert "CUDA_VISIBLE_DEVICES" not in kwargs["environment"]
+    assert "NVIDIA_VISIBLE_DEVICES" not in kwargs["environment"]
+
+
+def test_unknown_gpu_mode_rejected() -> None:
+    with pytest.raises(AppError):
+        DockerGpuRunExecutor(image_whitelist=[_IMAGE], docker_client=_mock_docker_client(), gpu_mode="bogus")
+
+
 async def test_empty_argv_rejected(executor: DockerGpuRunExecutor) -> None:
     with pytest.raises(AppError):
         await executor.start(_spec(argv=[]))

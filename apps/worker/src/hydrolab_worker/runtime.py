@@ -34,6 +34,7 @@ async def execute_run(run_id: UUID, attempt: int):
         allow_network=settings.runner_allow_network,
         container_python=settings.runner_container_python,
         default_timeout_seconds=settings.runner_default_timeout_seconds,
+        gpu_mode=settings.runner_gpu_mode,
     )
     storage = get_object_storage()
     control = RunControlService(
