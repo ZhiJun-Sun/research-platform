@@ -98,7 +98,27 @@ async def collection(run_id: UUID, request: Request, user: User = Depends(get_cu
     await _require_owner(request, user, run_id)
     report = request.app.state.run_control_service.collection_report(run_id)
     if report is None:
-        return {"collected": False, "metrics": [], "artifacts": [], "warnings": []}
+        persisted = await request.app.state.result_service.persisted_collection(run_id)
+        if persisted is None:
+            return {"collected": False, "metrics": [], "artifacts": [], "warnings": []}
+        return {
+            "collected": True,
+            "metrics": [
+                {"name": item.name, "value": item.value, "split": item.split, "horizon": item.horizon}
+                for item in persisted["metrics"]
+            ],
+            "artifacts": [
+                {
+                    "kind": item.kind,
+                    "relative_path": item.object_key.rsplit("/", 1)[-1],
+                    "object_key": item.object_key,
+                    "sha256": item.sha256,
+                    "size_bytes": 0,
+                }
+                for item in persisted["artifacts"]
+            ],
+            "warnings": [],
+        }
     return {
         "collected": True,
         "experiment_dirs": report.experiment_dirs,

@@ -204,6 +204,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # 而不是回落到全局 DATA_ROOT 软链接。
         dataset_versions=app.state.dataset_versions,
         artifacts=app.state.artifacts,
+        result_service=app.state.result_service,
     )
 
     # 单机双卡 FIFO 调度只对真实 Runner 启用。Fake 后端保留显式 start/complete

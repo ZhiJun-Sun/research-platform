@@ -25,6 +25,13 @@
 - Worker 重启导致进程内 `_started` 映射丢失时，会复用已有外部 Run，不创建重复 Run。
 - 新增 fake-client 回归测试覆盖重启/重放场景。
 
+### Result 自动持久化（B-05）
+
+- 真实 Runner 成功采集后，在标记 Run `SUCCEEDED` 前把 Result、MetricPoint 与 ResultArtifact 幂等写入领域仓储。
+- 生产 Worker 装配同一 `ResultService`；MySQL 后端因此不再依赖 Worker 进程内 `_reports`。
+- `/runs/{id}/collection` 在内存报告不存在时从持久结果、指标和产物回读；`/result/ingest` 保留为幂等确认接口。
+- 本地真实 subprocess 从网页提交小训练已验证：7 行日志、4 条指标、5 个产物自动登记，结果页直接可见。
+
 ### 资源权限（B-08）
 
 - Run 的 await、collection、events、logs、resources、SSE stream 全部增加 Run 所有者/管理员校验。
@@ -58,11 +65,9 @@ apps/api/.venv/bin/python -m pytest -q tests --disable-warnings
 
 TODO：在独立 MinIO bucket 中逐条验证 ZIP/数据上传、complete 后 HEAD、内容 hash、下载/范围读取、导出 bundle 和缺对象错误；同时检查所有导入路径不得依赖 Fake/Local 实现的 `.objects` 或 `._root` 私有字段。
 
-### B-05：Result 持久化
+### B-05 剩余验收：真实 MySQL 重启
 
-当前 `RunControlService.finalize` 将 `CollectionReport` 保存到进程内 `_reports`，并生成事件/日志；`ResultService` 已具备 `create_result`、`add_metrics`、`add_artifact` 的基本能力，但 finalize 尚未将 collection report 自动串联到持久 Result、MetricPoint、ResultArtifact/Checkpoint。
-
-TODO（需与 Agent A 协调）：将 collection report、指标、artifact、checkpoint 写入可跨 API/Worker 重启查询的 SQL store；补迁移、事务边界、owner 解析和 ingest 幂等；API 不得读取 Worker 进程内字典或 Worker 本地目录。需要真实 MySQL 重启恢复验收。
+代码路径已改为 Worker 自动写入 SQL store，并有新建 `ResultService` 后仍可回读的回归测试。由于本轮按用户要求不执行 A2 容器部署，真实 MySQL + API/Worker 重启验收仍需在 8 个服务启动后执行；不把本地 memory 后端宣称为真机重启通过。Checkpoint 独立领域对象的自动创建仍需补充模型签名等元数据；当前 checkpoint 文件已作为持久 ResultArtifact 可查。
 
 ### B-06：Docker 日志链路
 

@@ -3,7 +3,9 @@
 import io
 import zipfile
 
+from hydrolab.execution.collector import CollectedArtifact, CollectedMetric, CollectionReport
 from hydrolab.ports.dto import ObjectRef
+from hydrolab.results.service import ResultService
 from tests.conftest import TestContext
 from tests.test_execution import _queued_run
 
@@ -59,7 +61,7 @@ async def test_result_metrics_plot_and_export_are_traceable(ctx: TestContext) ->
         assert payload["plot"]["plot_type"] == plot_type
         assert {item["object_key"].rsplit(".", 1)[-1] for item in payload["artifacts"]} == {"png", "pdf", "svg", "csv"}
         for item in payload["artifacts"]:
-            stream = await ctx.app.state.result_service._storage.open_range(  # noqa: SLF001 - integration assertion
+            stream = await ctx.app.state.result_service._storage.open_range(
                 ObjectRef(key=item["object_key"]), 0
             )
             assert stream.read()
@@ -67,7 +69,7 @@ async def test_result_metrics_plot_and_export_are_traceable(ctx: TestContext) ->
     assert exported.status_code == 201, exported.text
     manifest = exported.json()["manifest"]
     assert manifest["format"] == "zip"
-    stream = await ctx.app.state.result_service._storage.open_range(  # noqa: SLF001 - integration assertion
+    stream = await ctx.app.state.result_service._storage.open_range(
         ObjectRef(key=manifest["object_key"]), 0
     )
     with zipfile.ZipFile(io.BytesIO(stream.read())) as bundle:
@@ -101,3 +103,50 @@ async def test_compare_rejects_results_from_different_dataset_versions(ctx: Test
     )
     assert compared.status_code == 409, compared.text
     assert "同一冻结数据版本" in compared.json()["error"]["message"]
+
+
+async def test_collection_is_persisted_idempotently_and_readable_after_service_restart(
+    ctx: TestContext,
+) -> None:
+    headers, run_id = await _completed_run(ctx)
+    report = CollectionReport(
+        experiment_dirs=["smoke"],
+        metrics=[CollectedMetric(name="NSE@Avg", value=0.9)],
+        artifacts=[
+            CollectedArtifact(
+                kind="predictions",
+                relative_path="experiments/smoke/results/predictions.csv",
+                object_key=f"run-artifacts/{run_id}/predictions.csv",
+                sha256="a" * 64,
+                size_bytes=10,
+            )
+        ],
+    )
+
+    first = await ctx.app.state.result_service.ingest_collection(run_id, report)
+    second = await ctx.app.state.result_service.ingest_collection(run_id, report)
+    assert first["metrics_added"] == 1
+    assert first["artifacts_added"] == 1
+    assert second["metrics_added"] == 0
+    assert second["artifacts_added"] == 0
+
+    restarted = ResultService(
+        ctx.app.state.results,
+        ctx.app.state.result_metrics,
+        ctx.app.state.result_artifacts,
+        ctx.app.state.plot_specs,
+        ctx.app.state.export_manifests,
+        ctx.app.state.runs,
+        ctx.app.state.experiment_versions,
+        ctx.app.state.result_service._storage,
+    )
+    persisted = await restarted.persisted_collection(run_id)
+    assert persisted is not None
+    assert [item.name for item in persisted["metrics"]] == ["NSE@Avg"]
+
+    # RunControlService has no in-memory report in this Fake-runner test, so
+    # this exercises the API's durable fallback used after process restarts.
+    collection = await ctx.client.get(f"/api/v1/runs/{run_id}/collection", headers=headers)
+    assert collection.status_code == 200, collection.text
+    assert collection.json()["collected"] is True
+    assert collection.json()["metrics"][0]["name"] == "NSE@Avg"

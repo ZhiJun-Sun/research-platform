@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ApiError, cancelRealRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createEnvironment, createEnvironmentVersion, createExport, createPlot, createTemplate, createTemplateVersion, dispatchOutbox, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getHealthReady, getRealSection, getRun, getRunCollection, getRunEvents, getRunResources, getRunStages, getRunLogs, getStoredUser, importCodeDirectory, importCodeGit, importCodeZip, ingestRunResult, listCheckpoints, listCodeImportRoots, listCodeRepositories, listCodeVersions, listDatasetVersions, listDatasets, listEnvironments, listEnvironmentVersions, listMetrics, listResults, listRuns, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, seedDemo, startRun, submitBatch, submitDraft, subscribeRunEvents, updateDraft } from './lib/api'
+import { ApiError, cancelRealRun, checkCheckpoint, compareResults, confirmDatasetMapping, createCodeRepository, createDataset, createDatasetImport, createDraft, createEnvironment, createEnvironmentVersion, createExport, createPlot, createTemplate, createTemplateVersion, dispatchOutbox, ensureDevSession, fakeUploadDataset, getCurrentUser, getDatasetMapping, getHealthReady, getRealSection, getRun, getRunCollection, getRunEvents, getRunResources, getRunStages, getRunLogs, getStoredUser, importCodeDirectory, importCodeGit, importCodeZip, ingestRunResult, listCheckpoints, listCodeImportRoots, listCodeRepositories, listCodeVersions, listDatasetVersions, listDatasets, listEnvironments, listEnvironmentVersions, listMetrics, listResults, listRuns, listTemplateVersions, listTemplates, login, logout, previewDirectoryImport, startRun, submitBatch, submitDraft, subscribeRunEvents, updateDraft } from './lib/api'
 import type { ApiBatchSubmitItem, ApiCatalogItem, ApiCodeRepository, ApiCodeVersion, ApiComparison, ApiDatasetVersion, ApiDirectoryPreview, ApiEnvironment, ApiEnvironmentVersion, ApiMappingItem, ApiMetric, ApiResourceSample, ApiResult, ApiRunCollection, ApiRunEvent, ApiRunLog, ApiRunStage, ApiRunSummary, ApiTemplateVersion, ApiUser } from './lib/api'
 import {
   Activity,
@@ -656,7 +656,7 @@ function RunDetail({ runId, back, onUpdated }: { runId: string | null; back: () 
         setMessage('Run 已取消，GPU 租约已释放。')
       } else {
         const result = await ingestRunResult(runId)
-        setMessage(`结果已入库：Result ${result.result.id.slice(0, 8)} · 指标 ${result.metrics_added} 条 · 产物 ${result.artifacts_added} 个${result.warnings?.length ? ` · 警告：${result.warnings.join('；')}` : ''}。`)
+        setMessage(`结果已入库：Result ${result.result.id.slice(0, 8)} · 指标 ${result.metrics_total ?? result.metrics_added} 条 · 产物 ${result.artifacts_total ?? result.artifacts_added} 个${result.warnings?.length ? ` · 警告：${result.warnings.join('；')}` : ''}。`)
       }
       await loadAll()
       onUpdated?.()
@@ -782,7 +782,6 @@ function ExperimentWizard({ close }: { close: () => void }) {
     void (async () => {
       try {
         await ensureDevSession()
-        await seedDemo()
         const [loadedTemplates, loadedDatasets, loadedEnvironments] = await Promise.all([listTemplates(), listDatasets(), listEnvironments()])
         const templates = (await Promise.all(loadedTemplates.map(async item => (await listTemplateVersions(item.id)).map(version => ({ id: version.id, code_version_id: version.code_version_id, mode: version.mode, argv: version.argv, parameters: (version.parameters ?? []) as unknown as ApiParameterDefinition[], label: `${item.name} · v${version.version_no} · ${version.argv.join(' ')}` }))))).flat()
         const datasets = (await Promise.all(loadedDatasets.map(async item => (await listDatasetVersions(item.id)).filter(version => version.status === 'READY').map(version => ({ id: version.id, label: `${item.name} · v${version.version_no}` }))))).flat()
@@ -927,13 +926,19 @@ function CodeRepositoryPanel() {
   const [error, setError] = useState<string | null>(null)
   const load = async () => {
     try {
-      await ensureDevSession(); await seedDemo()
+      await ensureDevSession()
       // 目录导入白名单由后端配置决定；为空表示该能力未开放。
       try { setImportRoots(await listCodeImportRoots()) } catch { setImportRoots([]) }
       const repos = await listCodeRepositories()
       setRepositories(repos)
       const loaded = await Promise.all(repos.map(async repo => [repo.id, await listCodeVersions(repo.id)] as const))
       setVersions(Object.fromEntries(loaded))
+      setEntrypoints(current => Object.fromEntries(
+        loaded.flatMap(([, items]) => items.map(version => [
+          version.id,
+          current[version.id] ?? 'python train.py --output-dir {OUTPUT_DIR}',
+        ])),
+      ))
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : '无法加载代码资产') }
   }
   useEffect(() => { void load() }, [])
@@ -944,9 +949,9 @@ function CodeRepositoryPanel() {
     return btoa(binary)
   }
   const createExecutable = async (repository: ApiCodeRepository, version: ApiCodeVersion) => {
-    const entrypoint = (entrypoints[version.id] || 'python train.py').trim()
+    const entrypoint = (entrypoints[version.id] || 'python train.py --output-dir {OUTPUT_DIR}').trim()
     const argv = entrypoint.split(/\s+/).filter(Boolean)
-    if (!argv.length) { setError('请填写训练入口，例如：python train.py'); return }
+    if (!argv.length) { setError('请填写训练入口，例如：python train.py --output-dir {OUTPUT_DIR}'); return }
     setSubmitting(true); setError(null)
     try {
       await ensureDevSession()
@@ -1019,7 +1024,6 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     setLoading(true); setError(null)
     try {
       await ensureDevSession()
-      await seedDemo()
       const loadedItems = await getRealSection(section)
       setItems(loadedItems)
       if (section === 'experiments') {
@@ -1107,7 +1111,7 @@ function ApiCatalogPage({ section }: { section: 'datasets' | 'code' | 'experimen
     } finally { setSubmitting(false) }
   }
   return <div className="page-stack">
-    <header className="page-heading"><div><p className="eyebrow">{config[0]}</p><h1>{config[1]}</h1><p>{config[2]} · 当前内容来自 FastAPI 本地 Fake/InMemory 工作区。</p></div><button className="button secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15}/>{loading ? '加载中' : '刷新'}</button></header>
+    <header className="page-heading"><div><p className="eyebrow">{config[0]}</p><h1>{config[1]}</h1><p>{config[2]} · 当前内容来自受保护的 FastAPI 业务接口。</p></div><button className="button secondary" onClick={() => void load()} disabled={loading}><RefreshCw size={15}/>{loading ? '加载中' : '刷新'}</button></header>
     {error && <p className="error-notice">API 联调错误：{error}</p>}
     {commandMessage && <p className="onboarding"><b>{commandMessage}</b></p>}
     {operationMessage && <p className="onboarding"><b>{operationMessage}</b></p>}
@@ -1186,7 +1190,7 @@ export default function App() {
           <button onClick={() => setView('environments')} className={view==='environments'?'active':''}><HardDrive size={17} />运行环境</button>
         </nav>
         <div className="sidebar-footer">
-          <div className="server-health"><span /><div><b>服务运行正常</b><small>本地 Fake/InMemory API</small></div></div>
+          <div className="server-health"><span /><div><b>服务运行正常</b><small>FastAPI 业务接口</small></div></div>
           <div className="account-anchor"><button onClick={() => setAccountOpen(open => !open)} aria-expanded={accountOpen}><div className="avatar">{user.display_name.slice(0, 2).toUpperCase()}</div><div><b>{user.display_name}</b><small>{user.is_admin ? '管理员' : '成员'}</small></div><ChevronRight size={14} /></button>{accountOpen && <AccountMenu user={user} close={() => setAccountOpen(false)} onLogout={() => void handleLogout()} />}</div>
         </div>
       </aside>

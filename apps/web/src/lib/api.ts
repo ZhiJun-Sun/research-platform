@@ -33,7 +33,7 @@ export type ApiRunLog = { id: number; run_id: string; content: string; stream: s
 export type ApiCollectedMetric = { name: string; value: number; split: string; horizon: number | null }
 export type ApiCollectedArtifact = { kind: string; relative_path: string; object_key: string; sha256: string; size_bytes: number }
 export type ApiRunCollection = { collected: boolean; experiment_dirs?: string[]; metrics: ApiCollectedMetric[]; artifacts: ApiCollectedArtifact[]; warnings: string[] }
-export type ApiRunIngest = { result: ApiResult; metrics_added: number; artifacts_added: number; experiment_dirs?: string[]; warnings: string[] }
+export type ApiRunIngest = { result: ApiResult; metrics_added: number; artifacts_added: number; metrics_total?: number; artifacts_total?: number; experiment_dirs?: string[]; warnings: string[] }
 
 export type ApiRunSummary = { id: string; experiment_id: string; experiment_name: string; experiment_version_id: string; status: string; argv: string[]; parameters: Record<string, unknown>; dataset_version_id: string | null; code_version_id: string | null; template_version_id: string | null; environment_version_id: string | null; created_at: string | null }
 export type ApiRunStage = { name: string; position: number; status: string }
@@ -131,7 +131,6 @@ async function withSessionRetry<T>(operation: () => Promise<T>): Promise<T> {
 }
 const authed = <T>(path: string, init?: RequestInit) => withSessionRetry(() => request<T>(path, init))
 
-export const seedDemo = () => authed<Record<string, string>>('/dev-demo/seed', { method: 'POST' })
 // 健康检查：无需登录；/api/v1 下的 health 由后端同时挂载，便于反向代理按 /api 前缀转发。
 export const getHealthReady = () => request<ApiHealthReady>('/health/ready')
 export async function getRealSection(section: 'datasets' | 'code' | 'experiments' | 'checkpoints' | 'results'): Promise<ApiCatalogItem[]> {

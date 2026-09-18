@@ -15,6 +15,7 @@ from hydrolab.execution.entities import RunExecution
 from hydrolab.execution.service import RunControlService
 from hydrolab.experiments.enums import RunStatus
 from hydrolab.ports.dto import RunState
+from hydrolab.results.service import ResultService
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -37,6 +38,16 @@ async def execute_run(run_id: UUID, attempt: int):
         gpu_mode=settings.runner_gpu_mode,
     )
     storage = get_object_storage()
+    result_service = ResultService(
+        stores.results,
+        stores.result_metrics,
+        stores.result_artifacts,
+        stores.plot_specs,
+        stores.export_manifests,
+        stores.runs,
+        stores.experiment_versions,
+        storage,
+    )
     control = RunControlService(
         stores.runs, stores.outbox, stores.gpu_leases, stores.executions,
         stores.run_events, stores.run_logs, stores.resource_samples,
@@ -44,6 +55,7 @@ async def execute_run(run_id: UUID, attempt: int):
         versions=stores.experiment_versions, code_versions=stores.code_versions,
         storage=storage, collector=ArtifactCollector(storage),
         dataset_versions=stores.dataset_versions, artifacts=stores.artifacts,
+        result_service=result_service,
     )
 
     async def cancelled():

@@ -173,13 +173,15 @@ async def test_subprocess_executor_runs_real_process_and_collects(tmp_path: Path
                 "p = argparse.ArgumentParser()",
                 "p.add_argument('--experiment', default='x')",
                 "p.add_argument('--epochs', type=int, default=1)",
+                "p.add_argument('--output-dir')",
                 "a = p.parse_args()",
                 "print('training epochs', a.epochs, flush=True)",
-                "d = Path('experiments')/a.experiment/'results'/'bj-0200'",
+                "root = Path(a.output_dir or os.environ['HYDROLAB_OUTPUT_DIR'])",
+                "d = root/'experiments'/a.experiment/'results'/'bj-0200'",
                 "d.mkdir(parents=True, exist_ok=True)",
                 "(d/'kg_moe_ms.json').write_text(json.dumps({'Avg': {'RMSE': 1.5, 'NSE': 0.9}}))",
                 "(d/'predictions.csv').write_text('t,y\\n1,2\\n')",
-                "c = Path('experiments')/a.experiment/'checkpoints'",
+                "c = root/'experiments'/a.experiment/'checkpoints'",
                 "c.mkdir(parents=True, exist_ok=True)",
                 "(c/'m.pth').write_bytes(b'w')",
                 "print('done', flush=True)",
@@ -198,11 +200,20 @@ async def test_subprocess_executor_runs_real_process_and_collects(tmp_path: Path
         workspace_root=tmp_path / "ws", python_executable=sys.executable, log_sink=sink
     )
     run_id = uuid4()
-    executor.prepare_workspace(run_id, snapshot.archive)
+    workspace = executor.prepare_workspace(run_id, snapshot.archive)
     handle = await executor.start(
         RunSpec(
             run_id=run_id,
-            argv=["python", "main.py", "--experiment", "smoke", "--epochs", "1"],
+            argv=[
+                "python",
+                "main.py",
+                "--experiment",
+                "smoke",
+                "--epochs",
+                "1",
+                "--output-dir",
+                str(workspace / "output"),
+            ],
             image_digest="local:subprocess",
             gpu_count=0,
         )
@@ -213,7 +224,6 @@ async def test_subprocess_executor_runs_real_process_and_collects(tmp_path: Path
     # stdout 必须被回流，供前端增量展示
     assert any("training epochs 1" in line for line in lines)
 
-    workspace = executor.workspace_for(run_id)
     report = ArtifactCollector(_Storage()).collect(str(run_id), [workspace / "output", workspace / "code"])
     assert {item.name for item in report.metrics} == {"RMSE@Avg", "NSE@Avg"}
     assert len(report.checkpoints) == 1

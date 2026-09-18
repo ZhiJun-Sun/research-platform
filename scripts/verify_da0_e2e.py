@@ -21,7 +21,7 @@ import argparse
 import asyncio
 import base64
 import io
-import json
+import logging
 import os
 import sys
 import time
@@ -102,13 +102,10 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
     os.environ.setdefault("HYDROLAB_RUNNER_PYTHON_EXECUTABLE", "/usr/bin/python3")
 
     import httpx
-
     from hydrolab.core.settings import get_settings
     from hydrolab.main import create_app
 
     # 抑制访问日志噪声，保持验收输出可读
-    import logging
-
     for name in ("hydrolab.access", "httpx", "hydrolab.bootstrap"):
         logging.getLogger(name).setLevel(logging.WARNING)
     logging.getLogger("hydrolab.access").disabled = True
@@ -122,8 +119,10 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
 
     app = create_app()
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://e2e") as client:
-        async with app.router.lifespan_context(app):
+    async with (
+        httpx.AsyncClient(transport=transport, base_url="http://e2e") as client,
+        app.router.lifespan_context(app),
+    ):
             api = "/api/v1"
 
             # ---------- 1. 登录 ----------
@@ -241,6 +240,8 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
                 "{epochs}",
                 "--experiment",
                 "{experiment}",
+                "--output-dir",
+                "{OUTPUT_DIR}",
             ]
             tv = await client.post(
                 f"{api}/templates/{template_id}/versions",
@@ -251,7 +252,10 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
                     "parameters": [
                         {"key": "epochs", "label": "训练轮数", "type": "INTEGER", "default": epochs, "minimum": 1}
                     ],
-                    "output_contract": {"experiments_dir": "experiments/<experiment>"},
+                    "output_contract": {
+                        "root": "HYDROLAB_OUTPUT_DIR",
+                        "experiments_dir": "experiments/<experiment>",
+                    },
                 },
                 headers=headers,
             )
@@ -375,12 +379,12 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
                 return 1
             ing = ingest.json()
             result_id = ing["result"]["id"]
-            report.check(ing["metrics_added"] > 0, "指标写入结果域", f"{ing['metrics_added']} 条")
-            report.check(ing["artifacts_added"] > 0, "产物写入结果域", f"{ing['artifacts_added']} 个")
+            report.check(ing["metrics_total"] > 0, "指标已自动写入结果域", f"{ing['metrics_total']} 条")
+            report.check(ing["artifacts_total"] > 0, "产物已自动写入结果域", f"{ing['artifacts_total']} 个")
 
             fetched = await client.get(f"{api}/results/{result_id}/metrics", headers=headers)
             report.check(
-                fetched.status_code == 200 and len(fetched.json()) == ing["metrics_added"],
+                fetched.status_code == 200 and len(fetched.json()) == ing["metrics_total"],
                 "结果指标可回读",
             )
 
@@ -389,7 +393,7 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
                 f"{api}/plots",
                 json={
                     "result_ids": [result_id],
-                    "plot_type": "hydrograph",
+                    "plot_type": "grouped_metrics",
                     "data_selection": {"basin_id": basin},
                     "options": {"horizon": "Avg"},
                 },
@@ -404,8 +408,8 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
             # ---------- 12. 校验工作区产物真实落盘 ----------
             run_workspace = Path(os.environ["HYDROLAB_RUNNER_WORKSPACE_ROOT"]) / run_id
             report.check(run_workspace.is_dir(), "Run 拥有独立工作目录", str(run_workspace))
-            produced = list((run_workspace / "code" / "experiments").rglob("*")) if (
-                run_workspace / "code" / "experiments"
+            produced = list((run_workspace / "output" / "experiments").rglob("*")) if (
+                run_workspace / "output" / "experiments"
             ).is_dir() else []
             report.check(len(produced) > 0, "工作目录内存在真实训练产物", f"{len(produced)} 个条目")
             objects_root = Path(os.environ["HYDROLAB_LOCAL_STORAGE_ROOT"])
@@ -418,7 +422,7 @@ async def run(source: Path, epochs: int, model: str, basin: str, timeout: float)
         for item in report.failures:
             print(f"  - {item}")
         return 1
-    print("结果：da0 真实端到端全部通过")
+    print("结果：HydroLab 真实端到端全部通过")
     return 0
 
 
@@ -436,7 +440,7 @@ def main() -> int:
         print(f"FAIL  源目录不含 main.py: {source}")
         return 1
     print("=" * 60)
-    print("HydroLab · da0 真实端到端验收")
+    print("HydroLab · 真实端到端验收")
     print(f"源目录 : {source}")
     print(f"模型   : {args.model}   流域: {args.basin}   epochs: {args.epochs}")
     print("=" * 60)

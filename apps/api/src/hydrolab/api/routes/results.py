@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from hydrolab.auth.dependencies import get_current_user
+from hydrolab.core.errors import not_found
 from hydrolab.domain.entities import User
 from hydrolab.results.entities import MetricPoint, ResultArtifact
 
@@ -59,42 +60,32 @@ async def ingest_result(run_id: UUID, request: Request, user: User = Depends(get
 
     这是 e2e 链路的收口：Runner 采集 → 结果域，前端随后可直接绘图/对比/导出。
     """
+    run = await request.app.state.runs.get(run_id)
+    if run is None or (run.owner_id != user.id and not user.is_admin):
+        raise not_found("Run 不存在")
     result_service = request.app.state.result_service
     report = request.app.state.run_control_service.collection_report(run_id)
-    result = await result_service.create_result(user, run_id)
     if report is None:
-        return {"result": result, "metrics_added": 0, "artifacts_added": 0, "warnings": ["没有采集报告"]}
-
-    metrics_added = 0
-    if report.metrics:
-        points = [
-            MetricPoint(
-                result_id=result.id,
-                name=item.name,
-                value=item.value,
-                split=item.split,
-                horizon=item.horizon,
-            )
-            for item in report.metrics
-        ]
-        metrics_added = len(await result_service.add_metrics(user, result.id, points))
-
-    artifacts_added = 0
-    for item in report.artifacts + report.configs + report.checkpoints:
-        await result_service.add_artifact(
-            user,
-            result.id,
-            ResultArtifact(result_id=result.id, kind=item.kind, object_key=item.object_key, sha256=item.sha256),
-        )
-        artifacts_added += 1
-
-    return {
-        "result": result,
-        "metrics_added": metrics_added,
-        "artifacts_added": artifacts_added,
-        "experiment_dirs": report.experiment_dirs,
-        "warnings": report.warnings[:20],
-    }
+        persisted = await result_service.persisted_collection(run_id)
+        if persisted is None:
+            result = await result_service.create_result(user, run_id)
+            return {
+                "result": result,
+                "metrics_added": 0,
+                "artifacts_added": 0,
+                "metrics_total": 0,
+                "artifacts_total": 0,
+                "warnings": ["没有采集报告"],
+            }
+        return {
+            "result": persisted["result"],
+            "metrics_added": 0,
+            "artifacts_added": 0,
+            "metrics_total": len(persisted["metrics"]),
+            "artifacts_total": len(persisted["artifacts"]),
+            "warnings": [],
+        }
+    return await result_service.ingest_collection(run_id, report)
 
 
 @router.post("/results/{result_id}/metrics", status_code=201)

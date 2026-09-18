@@ -64,8 +64,8 @@ npm run build
 ## 当前接入范围
 
 - **运行中心**：接入 FastAPI `/auth/login` 与受保护执行面 API，展示当前用户全部真实 Run（`GET /runs`），支持启动/取消（`POST /runs/{id}/start|cancel`）、投递队列（`POST /internal/outbox/dispatch`）并进入 Run 详情。
-- **Run 详情**：接入 `GET /runs/{id}`、`/stages`、`/resources`、`/logs?after_id=`、`/events?after_id=`，并消费 `GET /runs/{id}/events/stream` 的 SSE（`Last-Event-ID` 断点续传 + 自动重连）驱动训练指标、GPU 资源与实时日志；成功 Run 可一键「采集结果入库」（`POST /runs/{id}/result/ingest`）。
-- **数据 / 模型代码 / 模板 / 环境 / 实验 / Checkpoint / 结果与对比**：均通过正式业务端点读取（`/datasets`、`/code-repositories`、`/templates`、`/environments`、`/experiments`、`/checkpoints`、`/results`）。页面加载时会调用幂等的 `POST /dev-demo/seed`，由后端按 B2–B8 领域服务真实创建 DatasetVersion、CodeVersion、TemplateVersion、EnvironmentVersion、Experiment、Run、Checkpoint、Result 与指标。
+- **Run 详情**：接入 `GET /runs/{id}`、`/stages`、`/resources`、`/logs?after_id=`、`/events?after_id=`，并消费 `GET /runs/{id}/events/stream` 的 SSE（`Last-Event-ID` 断点续传 + 自动重连）驱动训练指标、GPU 资源与实时日志；成功 Run 由 Worker 自动把指标和产物写入结果域，`POST /runs/{id}/result/ingest` 保留为幂等确认入口。
+- **数据 / 模型代码 / 模板 / 环境 / 实验 / Checkpoint / 结果与对比**：均通过正式业务端点读取（`/datasets`、`/code-repositories`、`/templates`、`/environments`、`/experiments`、`/checkpoints`、`/results`）。页面加载不依赖仅在非生产环境挂载的 `/dev-demo/seed`；空账号会正常显示空列表和导入入口。
 - **可写操作**：数据页可真实 `POST /datasets`，实验页可真实 `POST /experiment-drafts`；「创建实验」走真实草稿流（createDraft → updateDraft → submitDraft），「批量提交」走 `POST /runs/batch`。
 - **结果与对比**：结果索引读取 `GET /results` 与 `GET /results/{id}/metrics`，详情展示真实指标、采集产物（`GET /runs/{id}/collection`），「添加图表」调用 `POST /plots`，「选择文件导出」调用 `POST /exports`，对比页调用 `POST /results/compare`。
 - **训练执行**：Fake/InMemory Runner，不会启动真实训练或占用 GPU；subprocess 真实执行链路由 `infra/README.md` 说明。

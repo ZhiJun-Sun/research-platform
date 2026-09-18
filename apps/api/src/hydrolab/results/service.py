@@ -48,6 +48,95 @@ class ResultService:
         self._versions = versions
         self._storage = storage
 
+    async def ingest_collection(self, run_id: UUID, report: object) -> dict[str, object]:
+        """Persist a Runner collection report without relying on Worker memory.
+
+        The Worker may retry finalization after a process or database failure, so
+        ingestion is content-idempotent for the Result, metrics, and artifacts.
+        The Run can still be RUNNING here; it is marked SUCCEEDED only after this
+        method completes.
+        """
+        run_id = UUID(str(run_id))
+        run = await self._runs.get(run_id)
+        if run is None:
+            raise not_found("Run 不存在")
+        version = await self._versions.get(run.experiment_version_id)
+        if version is None:
+            raise conflict("Run 对应的实验版本不存在")
+        dataset_version_id = version.resolved_config.get("dataset_version_id")
+        if not isinstance(dataset_version_id, str):
+            raise conflict("实验版本缺少冻结数据版本")
+
+        existing_results = await self._results.list_by_run(run_id)
+        result = existing_results[0] if existing_results else await self._results.add(
+            Result(run_id=run_id, owner_id=run.owner_id, dataset_version_id=dataset_version_id)
+        )
+
+        existing_metrics = await self._metrics.list_by_result(result.id)
+        metric_keys = {
+            (item.name, item.value, item.split, item.horizon, item.basin_id, item.event_id)
+            for item in existing_metrics
+        }
+        new_metrics: list[MetricPoint] = []
+        for item in getattr(report, "metrics", []):
+            point = MetricPoint(
+                result_id=result.id,
+                name=item.name,
+                value=item.value,
+                split=item.split,
+                horizon=item.horizon,
+            )
+            key = (point.name, point.value, point.split, point.horizon, point.basin_id, point.event_id)
+            if key not in metric_keys:
+                metric_keys.add(key)
+                new_metrics.append(point)
+        if new_metrics:
+            await self._metrics.add_many(new_metrics)
+
+        existing_artifacts = await self._artifacts.list_by_result(result.id)
+        artifact_keys = {(item.kind, item.object_key, item.sha256) for item in existing_artifacts}
+        new_artifacts: list[ResultArtifact] = []
+        collected = (
+            list(getattr(report, "artifacts", []))
+            + list(getattr(report, "configs", []))
+            + list(getattr(report, "checkpoints", []))
+        )
+        for item in collected:
+            key = (item.kind, item.object_key, item.sha256)
+            if key in artifact_keys:
+                continue
+            artifact_keys.add(key)
+            artifact = ResultArtifact(
+                result_id=result.id,
+                kind=item.kind,
+                object_key=item.object_key,
+                sha256=item.sha256,
+            )
+            new_artifacts.append(await self._artifacts.add(artifact))
+
+        return {
+            "result": result,
+            "metrics_added": len(new_metrics),
+            "artifacts_added": len(new_artifacts),
+            "metrics_total": len(metric_keys),
+            "artifacts_total": len(artifact_keys),
+            "experiment_dirs": list(getattr(report, "experiment_dirs", [])),
+            "warnings": list(getattr(report, "warnings", []))[:20],
+        }
+
+    async def persisted_collection(self, run_id: UUID) -> dict[str, object] | None:
+        """Read the durable result view used after API/Worker restarts."""
+        run_id = UUID(str(run_id))
+        results = await self._results.list_by_run(run_id)
+        if not results:
+            return None
+        result = results[0]
+        return {
+            "result": result,
+            "metrics": await self._metrics.list_by_result(result.id),
+            "artifacts": await self._artifacts.list_by_result(result.id),
+        }
+
     async def create_result(self, owner: User, run_id: UUID) -> Result:
         run = await self._runs.get(run_id)
         if run is None or run.owner_id != owner.id:
@@ -138,8 +227,14 @@ class ResultService:
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
             readme = ["# HydroLab result export", "", "## Included results"]
             for result in results:
-                readme.append(f"- result_id: {result.id}; run_id: {result.run_id}; dataset_version_id: {result.dataset_version_id}")
-                bundle.writestr(f"metrics/{result.id}.csv", self._metrics_csv(await self._metrics.list_by_result(result.id)))
+                readme.append(
+                    f"- result_id: {result.id}; run_id: {result.run_id}; "
+                    f"dataset_version_id: {result.dataset_version_id}"
+                )
+                bundle.writestr(
+                    f"metrics/{result.id}.csv",
+                    self._metrics_csv(await self._metrics.list_by_result(result.id)),
+                )
             readme.extend(["", "## Included artifacts"])
             for artifact in selected:
                 filename = artifact.object_key.rsplit("/", 1)[-1]
@@ -191,7 +286,16 @@ class ResultService:
         writer = csv.writer(text)
         writer.writerow(["name", "value", "split", "horizon", "basin_id", "event_id"])
         for item in metrics:
-            writer.writerow([item.name, item.value, item.split, item.horizon or "", item.basin_id or "", item.event_id or ""])
+            writer.writerow(
+                [
+                    item.name,
+                    item.value,
+                    item.split,
+                    item.horizon or "",
+                    item.basin_id or "",
+                    item.event_id or "",
+                ]
+            )
         return text.getvalue()
 
     @staticmethod

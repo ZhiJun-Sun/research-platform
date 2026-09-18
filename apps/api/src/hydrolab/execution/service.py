@@ -64,6 +64,7 @@ class RunControlService:
         collector: ArtifactCollector | None = None,
         dataset_versions: Any | None = None,
         artifacts: Any | None = None,
+        result_service: Any | None = None,
     ) -> None:
         self._runs, self._outbox, self._leases, self._executions = runs, outbox, leases, executions
         self._events, self._logs, self._samples, self._queue, self._executor = events, logs, samples, queue, executor
@@ -75,6 +76,7 @@ class RunControlService:
         self._collector = collector
         self._dataset_versions = dataset_versions
         self._artifacts = artifacts
+        self._result_service = result_service
         self._reports: dict[UUID, CollectionReport] = {}
         self._tracking_refs: dict[UUID, ExternalRunRef] = {}
 
@@ -418,6 +420,19 @@ class RunControlService:
                 )
                 + "\n",
             )
+            if self._result_service is not None:
+                persisted = await self._result_service.ingest_collection(run_id, report)
+                await self._logs.append(
+                    run_id,
+                    json.dumps(
+                        {
+                            "persisted_metrics": persisted["metrics_total"],
+                            "persisted_artifacts": persisted["artifacts_total"],
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n",
+                )
 
         run.status, run.updated_at = (RunStatus.SUCCEEDED if exit_code == 0 else RunStatus.FAILED), utcnow()
         try:
